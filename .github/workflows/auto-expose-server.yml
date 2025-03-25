@@ -34,4 +34,4 @@ jobs:
         run: |
           /opt/mssql-tools/bin/sqlcmd -S "localhost,${{ env.PINGGY_PORT }}" \
           -U ${{ secrets.SQL_USER }} -P ${{ secrets.SQL_PASSWORD }} \
-          -i ./scripts/setup-database.sql
+          -i TestQuery.sql
