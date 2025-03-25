@@ -21,62 +21,81 @@ jobs:
 
     steps:
     # --- SETUP ---
-    - name: Checkout
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    # --- DEPENDENCIES ---
+    - name: Install system dependencies
       run: |
         sudo apt-get update
-        # Install SQL tools
-        curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-        curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
-        sudo apt-get install -y mssql-tools unixodbc-dev jq
+        sudo apt-get install -y \
+          curl \
+          gnupg \
+          unixodbc-dev \
+          jq \
+          python3
+
+    - name: Add Microsoft repository (Ubuntu 24.04)
+      run: |
+        curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/microsoft.list
+
+    - name: Install SQL Server tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mssql-tools
         echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-        
-        # Download Localtonet
+        source ~/.bashrc
+
+    # --- LOCALTONET SETUP ---
+    - name: Download and configure Localtonet
+      run: |
         wget -q https://localtonet.com/download/linux -O localtonet
         chmod +x localtonet
+        ./localtonet authtoken $LOCALTONET_TOKEN
 
-    # --- TUNNEL SETUP ---
+    # --- TUNNEL ESTABLISHMENT ---
+    - name: Start test HTTP server
+      run: |
+        python3 -m http.server $TEST_PORT > http.log 2>&1 &
+
     - name: Establish tunnels
       id: tunnel
       run: |
-        # Start test HTTP server
-        python3 -m http.server $TEST_PORT > http.log 2>&1 &
-        
-        # Start tunnels
-        ./localtonet authtoken $LOCALTONET_TOKEN
+        # Start SQL tunnel
         ./localtonet tcp 1433 --hostname sql-$GITHUB_RUN_ID > sql_tunnel.log 2>&1 &
-        ./localtonet http $TEST_PORT --hostname test-$GITHUB_RUN_ID > http_tunnel.log 2>&1 &
-        sleep 10
         
-        # Get URLs
+        # Start test HTTP tunnel
+        ./localtonet http $TEST_PORT --hostname test-$GITHUB_RUN_ID > http_tunnel.log 2>&1 &
+        
+        sleep 10  # Wait for tunnels to establish
+        
+        # Extract URLs
         SQL_URL=$(grep -oP 'tcp://\K[^ ]+' sql_tunnel.log)
         HTTP_URL=$(grep -oP 'https://\K[^ ]+' http_tunnel.log)
         
         echo "SQL_HOST_PORT=$SQL_URL" >> $GITHUB_OUTPUT
         echo "TEST_URL=https://$HTTP_URL" >> $GITHUB_OUTPUT
-        
         echo "🔗 Test URL: https://$HTTP_URL"
         echo "🛢️ SQL Endpoint: tcp://$SQL_URL"
 
     # --- CONNECTION VERIFICATION ---
     - name: Verify connectivity
       run: |
-        # Wait for user testing (comment out for fully automated)
-        echo "⏳ Verify connection at: ${{ steps.tunnel.outputs.TEST_URL }}"
-        sleep 120  # Gives 2 minutes to test
+        echo "⏳ Please verify connection at: ${{ steps.tunnel.outputs.TEST_URL }}"
+        echo "Waiting 60 seconds for manual verification..."
+        sleep 60
         
         # Automated verification
         if curl -s ${{ steps.tunnel.outputs.TEST_URL }} | grep -q "Directory listing"; then
           echo "✅ Tunnel working"
         else
-          echo "❌ Tunnel failed"
+          echo "❌ Tunnel failed - check tunnel logs"
           exit 1
         fi
 
     # --- SQL EXECUTION ---
-    - name: Execute SQL
+    - name: Execute SQL script
       run: |
         echo "Executing ${{ github.event.inputs.sql_file }}"
         sqlcmd -S "${{ steps.tunnel.outputs.SQL_HOST_PORT }}" \
@@ -84,8 +103,9 @@ jobs:
                -P "$SQL_PASSWORD" \
                -i "${{ github.event.inputs.sql_file }}" \
                -o output.log \
-               -e  # Echo input commands
+               -b  # Return error on T-SQL errors
         
+        # Show execution results
         cat output.log
         
         # Fail if errors occurred
@@ -98,6 +118,6 @@ jobs:
     - name: Terminate tunnels
       if: always()
       run: |
-        pkill -f localtonet
-        pkill -f "http.server"
-        echo "Tunnels terminated"
+        pkill -f localtonet || true
+        pkill -f "http.server" || true
+        echo "All tunnels terminated"
