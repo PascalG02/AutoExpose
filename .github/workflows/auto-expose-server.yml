@@ -1,70 +1,37 @@
-name: Execute SQL Server Script from Repository
+name: SQL Automation with Dynamic SSH
 
-on:
+on: 
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      sql_file_path:
-        description: 'Path to SQL file in repository'
-        required: true
-        default: 'TestQuery.sql'
-
-env:
-  NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-  SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
-  SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
 
 jobs:
-  execute-sql:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Install ngrok and dependencies
-      run: |
-        curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-        sudo apt update && sudo apt install ngrok jq curl
-        
-    - name: Authenticate ngrok
-      run: ngrok authtoken $NGROK_AUTH_TOKEN
-      
-    - name: Start ngrok tunnel
-      run: |
-        nohup ngrok http 3000 --log=stdout > ngrok.log &
-        sleep 5  # Wait for ngrok to initialize
-        
-    - name: Get ngrok URL
-      id: ngrok
-      run: |
-        NGROK_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-        echo "NGROK_URL=${NGROK_URL}" >> $GITHUB_OUTPUT
-        echo "Public URL: ${NGROK_URL}"
-        
-    - name: Execute SQL script file
-      run: |
-        # Basic auth for security
-        AUTH=$(echo -n "$SERVER_USERNAME:$SERVER_PASSWORD" | base64)
-        
-        # Send the SQL file to your local server
-        RESPONSE=$(curl -s -X POST \
-          "${{ steps.ngrok.outputs.NGROK_URL }}/execute-sql-file" \
-          -H "Authorization: Basic $AUTH" \
-          -F "sqlFile=@${{ github.event.inputs.sql_file_path }}")
-        
-        echo "Execution results:"
-        echo $RESPONSE | jq .
-        
-        # Fail the job if any command failed
-        if [ $(echo $RESPONSE | jq '.success') != 'true' ]; then
-          echo "SQL execution failed"
-          exit 1
-        fi
-        
-        # Check individual command results
-        FAILED_COMMANDS=$(echo $RESPONSE | jq '.results[] | select(.error)')
-        if [ "$FAILED_COMMANDS" != "" ]; then
-          echo "Some SQL commands failed:"
-          echo $FAILED_COMMANDS
-          exit 1
-        fi
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start Pinggy Tunnel via Dynamic SSH
+        run: |
+          nohup ${{ secrets.PINGGY_SSH }} > pinggy_output.txt 2>&1 &
+          sleep 5  # Wait for Pinggy to initialize
+
+      - name: Extract Pinggy Port
+        run: |
+          PORT=$(grep -oP 'localhost:(\d+)' pinggy_output.txt | grep -oP '\d+')
+          echo "PINGGY_PORT=$PORT" >> $GITHUB_ENV
+
+      - name: Install SQLCMD tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
+          echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
+
+      - name: Run SQL Script
+        run: |
+          /opt/mssql-tools/bin/sqlcmd -S "localhost,${{ env.PINGGY_PORT }}" \
+          -U ${{ secrets.SQL_USER }} -P ${{ secrets.SQL_PASSWORD }} \
+          -i ./scripts/setup-database.sql
