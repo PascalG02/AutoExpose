@@ -16,6 +16,18 @@ jobs:
           Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
           Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
 
-      - name: Display Pinggy Tunnel Output
+      - name: Echo Pinggy Tunnel Output as Message
         run: |
-          Get-Content "pinggy_output.txt"
+          $output = Get-Content "pinggy_output.txt" | Out-String
+          Write-Host "::notice:: Pinggy Output: $output"
+
+      - name: Save Pinggy Output as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: pinggy-output
+          path: pinggy_output.txt
+
+      - name: Set Pinggy Output as Workflow Output
+        id: set_output
+        run: |
+          echo "PINGGY_OUTPUT=$(cat pinggy_output.txt)" >> $GITHUB_ENV
