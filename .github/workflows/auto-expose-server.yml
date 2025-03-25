@@ -24,49 +24,44 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # --- PACKAGE CLEANUP ---
-    - name: Remove conflicting Microsoft sources
+    # --- NUCLEAR OPTION: CLEAN ALL MICROSOFT CONFIGS ---
+    - name: Purge all Microsoft repo configurations
       run: |
-        sudo rm -f /etc/apt/sources.list.d/microsoft.list
-        sudo rm -f /etc/apt/sources.list.d/msprod.list
-        sudo rm -f /usr/share/keyrings/microsoft-prod.gpg
-        sudo rm -f /usr/share/keyrings/microsoft.gpg
+        sudo rm -f /etc/apt/sources.list.d/microsoft*
+        sudo rm -f /etc/apt/sources.list.d/msprod*
+        sudo rm -f /usr/share/keyrings/microsoft*
+        sudo rm -f /usr/share/keyrings/msprod*
+        sudo rm -f /etc/apt/trusted.gpg.d/microsoft*
+        echo "All Microsoft package configurations removed"
 
-    # --- DEPENDENCY INSTALLATION ---
-    - name: Install system tools
+    # --- FRESH MICROSOFT REPO SETUP ---
+    - name: Configure Microsoft repository (Ubuntu 24.04)
       run: |
+        # Install prerequisites
         sudo apt-get update
-        sudo apt-get install -y \
-          curl \
-          gnupg \
-          unixodbc-dev \
-          jq \
-          python3 \
-          ca-certificates
+        sudo apt-get install -y curl gnupg ca-certificates
+        
+        # Create fresh keyring
+        sudo mkdir -p /usr/share/keyrings
+        curl https://packages.microsoft.com/keys/microsoft.asc | \
+          sudo gpg --dearmor -o /usr/share/keyrings/mssql-release.gpg
+        
+        # Add repository with explicit overwrite
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/mssql-release.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | \
+          sudo tee /etc/apt/sources.list.d/mssql-release.list
+        
+        # Verify configuration
+        ls -la /usr/share/keyrings/ | grep mssql
+        cat /etc/apt/sources.list.d/mssql-release.list
 
-    # --- MICROSOFT REPO SETUP ---
-    - name: Configure Microsoft repository
-      run: |
-        # Clean any existing configs first
-        sudo rm -f /etc/apt/sources.list.d/microsoft.list
-        
-        # Add new trusted key
-        curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-packages.gpg
-        
-        # Add repository (Ubuntu 24.04)
-        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-packages.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/microsoft-packages.list
-        
-        # Verify file was created
-        ls -la /etc/apt/sources.list.d/
-        cat /etc/apt/sources.list.d/microsoft-packages.list
-
-    # --- SQL TOOLS INSTALLATION ---
+    # --- PACKAGE INSTALLATION ---
     - name: Install SQL Server tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y mssql-tools
+        sudo apt-get install -y mssql-tools unixodbc-dev
         echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
         source ~/.bashrc
+        sqlcmd -?  # Verify installation
 
     # --- LOCALTONET SETUP ---
     - name: Configure Localtonet
@@ -76,40 +71,31 @@ jobs:
         ./localtonet authtoken $LOCALTONET_TOKEN
 
     # --- TUNNEL ESTABLISHMENT ---
-    - name: Start test HTTP server
-      run: |
-        python3 -m http.server $TEST_PORT > http.log 2>&1 &
-
     - name: Establish tunnels
       id: tunnel
       run: |
+        python3 -m http.server $TEST_PORT > http.log 2>&1 &
         ./localtonet tcp 1433 --hostname sql-$GITHUB_RUN_ID > sql_tunnel.log 2>&1 &
         ./localtonet http $TEST_PORT --hostname test-$GITHUB_RUN_ID > http_tunnel.log 2>&1 &
         sleep 10
         
-        SQL_URL=$(grep -oP 'tcp://\K[^ ]+' sql_tunnel.log || echo "failed")
-        HTTP_URL=$(grep -oP 'https://\K[^ ]+' http_tunnel.log || echo "failed")
+        SQL_URL=$(grep -oP 'tcp://\K[^:]+' sql_tunnel.log)
+        HTTP_URL=$(grep -oP 'https://\K[^ ]+' http_tunnel.log)
         
-        if [[ "$SQL_URL" == "failed" || "$HTTP_URL" == "failed" ]]; then
-          echo "::error::Tunnel setup failed"
-          cat sql_tunnel.log
-          cat http_tunnel.log
-          exit 1
-        fi
-        
-        echo "SQL_HOST_PORT=$SQL_URL" >> $GITHUB_OUTPUT
-        echo "TEST_URL=https://$HTTP_URL" >> $GITHUB_OUTPUT
+        echo "SQL_HOST_PORT=${SQL_URL}:1433" >> $GITHUB_OUTPUT
+        echo "TEST_URL=https://${HTTP_URL}" >> $GITHUB_OUTPUT
+        echo "SQL Endpoint: ${SQL_URL}:1433"
+        echo "Test URL: https://${HTTP_URL}"
 
-    # --- EXECUTION ---
-    - name: Execute SQL
+    # --- SQL EXECUTION ---
+    - name: Execute SQL script
       run: |
         sqlcmd -S "${{ steps.tunnel.outputs.SQL_HOST_PORT }}" \
                -U "$SQL_USER" \
                -P "$SQL_PASSWORD" \
                -i "${{ github.event.inputs.sql_file }}" \
                -o output.log \
-               -b -r 1  # Strict error handling
-        
+               -b -r 1
         cat output.log
         ! grep -q "Msg [0-9]" output.log
 
@@ -119,4 +105,4 @@ jobs:
       run: |
         pkill -f localtonet || true
         pkill -f "http.server" || true
-        echo "Cleanup complete"
+        echo "All resources cleaned"
