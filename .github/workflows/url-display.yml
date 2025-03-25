@@ -18,5 +18,4 @@ jobs:
 
       - name: Display Pinggy Tunnel Output
         run: |
-          Get-Content "pinggy_output.txt" | Write-Host
-
+          Get-Content "pinggy_output.txt"
