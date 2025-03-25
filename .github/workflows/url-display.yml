@@ -22,7 +22,7 @@ jobs:
           Write-Host "::notice:: Pinggy Output: $output"
 
       - name: Save Pinggy Output as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # Updated to v2
         with:
           name: pinggy-output
           path: pinggy_output.txt
