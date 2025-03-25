@@ -6,7 +6,7 @@ on:
       sql_file:
         description: 'Path to SQL script'
         required: true
-        default: 'scripts/query.sql'
+        default: 'TestQuery.sql'
 
 env:
   LOCALTONET_TOKEN: ${{ secrets.LOCALTONET_TOKEN }}
