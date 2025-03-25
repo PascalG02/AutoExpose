@@ -1,0 +1,29 @@
+name: Display Pinggy Tunnel URL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: windows-latest  # Windows runner for PowerShell compatibility
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start Pinggy Tunnel via PowerShell
+        run: |
+          Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
+          Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
+
+      - name: Extract and Display Pinggy Tunnel URL
+        run: |
+          $port = Select-String -Path "pinggy_output.txt" -Pattern 'localhost:(\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
+          if ($port) {
+            $url = "http://localhost:$port"
+            Write-Host "::notice:: Tunnel URL: $url"
+            echo "PINGGY_URL=$url" | Out-File -Append -FilePath $env:GITHUB_ENV
+          } else {
+            Write-Host "::error:: Failed to detect Pinggy port."
+            exit 1
+          }
