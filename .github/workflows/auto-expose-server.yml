@@ -21,10 +21,19 @@ jobs:
           Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
           Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
 
-      - name: Extract Pinggy Port
+      - name: Extract Pinggy URL and Port
         run: |
-          $port = Select-String -Path "pinggy_output.txt" -Pattern 'localhost:(\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
-          echo "PINGGY_PORT=$port" | Out-File -Append -FilePath $env:GITHUB_ENV
+          $url = Select-String -Path "pinggy_output.txt" -Pattern '(\S+\.pinggy\.link),(\d+)' | ForEach-Object { "$($_.Matches.Groups[1].Value),$($_.Matches.Groups[2].Value)" }
+          if (-not $url) {
+            Write-Host "::error:: Failed to detect Pinggy tunnel URL. Check tunnel status."
+            exit 1
+          }
+          echo "PINGGY_URL=$url" | Out-File -Append -FilePath $env:GITHUB_ENV
+
+      - name: Add Firewall Rule for SQL Port
+        run: |
+          $port = $env:PINGGY_URL.Split(',')[1]
+          netsh advfirewall firewall add rule name="Allow SQL Server Port" dir=in action=allow protocol=TCP localport=$port
 
       - name: Install SQLCMD Tools
         run: |
@@ -33,9 +42,13 @@ jobs:
           Invoke-WebRequest -Uri "https://aka.ms/getsqlcmd" -OutFile "sqlcmd.msi"
           Start-Process msiexec.exe -ArgumentList "/i sqlcmd.msi /quiet /norestart" -Wait
 
+      - name: Verify SQLCMD Path
+        run: |
+          Get-Command sqlcmd -ErrorAction Continue
+
       - name: Run SQL Script
         run: |
           & "C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe" `
-          -S "localhost,${{ env.PINGGY_PORT }}" `
+          -S "${{ env.PINGGY_URL }}" `
           -U ${{ secrets.SQL_USER }} -P ${{ secrets.SQL_PASSWORD }} `
           -i "${{ inputs.sql_script }}"
