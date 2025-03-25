@@ -1,5 +1,4 @@
-
-name: Display Pinggy Tunnel
+name: Display Pinggy Tunnel Output
 
 on:
   workflow_dispatch:
@@ -17,12 +16,7 @@ jobs:
           Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
           Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
 
-      - name: Extract and Display Tunnel Port
+      - name: Display Pinggy Tunnel Output
         run: |
-          $port = Select-String -Path "pinggy_output.txt" -Pattern 'localhost:(\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
-          if ($port) {
-            Write-Host "::notice:: Tunnel Port: $port"
-          } else {
-            Write-Host "::error:: Failed to detect Pinggy port."
-            exit 1
-          }
+          Get-Content "pinggy_output.txt" | Write-Host
+
