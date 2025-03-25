@@ -20,12 +20,20 @@ jobs:
     timeout-minutes: 15
 
     steps:
-    # --- SETUP ---
+    # --- INITIAL SETUP ---
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # --- DEPENDENCIES ---
-    - name: Install system dependencies
+    # --- PACKAGE CLEANUP ---
+    - name: Remove conflicting Microsoft sources
+      run: |
+        sudo rm -f /etc/apt/sources.list.d/microsoft.list
+        sudo rm -f /etc/apt/sources.list.d/msprod.list
+        sudo rm -f /usr/share/keyrings/microsoft-prod.gpg
+        sudo rm -f /usr/share/keyrings/microsoft.gpg
+
+    # --- DEPENDENCY INSTALLATION ---
+    - name: Install system tools
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -33,13 +41,26 @@ jobs:
           gnupg \
           unixodbc-dev \
           jq \
-          python3
+          python3 \
+          ca-certificates
 
-    - name: Add Microsoft repository (Ubuntu 24.04)
+    # --- MICROSOFT REPO SETUP ---
+    - name: Configure Microsoft repository
       run: |
-        curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
-        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/microsoft.list
+        # Clean any existing configs first
+        sudo rm -f /etc/apt/sources.list.d/microsoft.list
+        
+        # Add new trusted key
+        curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-packages.gpg
+        
+        # Add repository (Ubuntu 24.04)
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-packages.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/microsoft-packages.list
+        
+        # Verify file was created
+        ls -la /etc/apt/sources.list.d/
+        cat /etc/apt/sources.list.d/microsoft-packages.list
 
+    # --- SQL TOOLS INSTALLATION ---
     - name: Install SQL Server tools
       run: |
         sudo apt-get update
@@ -48,7 +69,7 @@ jobs:
         source ~/.bashrc
 
     # --- LOCALTONET SETUP ---
-    - name: Download and configure Localtonet
+    - name: Configure Localtonet
       run: |
         wget -q https://localtonet.com/download/linux -O localtonet
         chmod +x localtonet
@@ -62,57 +83,35 @@ jobs:
     - name: Establish tunnels
       id: tunnel
       run: |
-        # Start SQL tunnel
         ./localtonet tcp 1433 --hostname sql-$GITHUB_RUN_ID > sql_tunnel.log 2>&1 &
-        
-        # Start test HTTP tunnel
         ./localtonet http $TEST_PORT --hostname test-$GITHUB_RUN_ID > http_tunnel.log 2>&1 &
+        sleep 10
         
-        sleep 10  # Wait for tunnels to establish
+        SQL_URL=$(grep -oP 'tcp://\K[^ ]+' sql_tunnel.log || echo "failed")
+        HTTP_URL=$(grep -oP 'https://\K[^ ]+' http_tunnel.log || echo "failed")
         
-        # Extract URLs
-        SQL_URL=$(grep -oP 'tcp://\K[^ ]+' sql_tunnel.log)
-        HTTP_URL=$(grep -oP 'https://\K[^ ]+' http_tunnel.log)
+        if [[ "$SQL_URL" == "failed" || "$HTTP_URL" == "failed" ]]; then
+          echo "::error::Tunnel setup failed"
+          cat sql_tunnel.log
+          cat http_tunnel.log
+          exit 1
+        fi
         
         echo "SQL_HOST_PORT=$SQL_URL" >> $GITHUB_OUTPUT
         echo "TEST_URL=https://$HTTP_URL" >> $GITHUB_OUTPUT
-        echo "🔗 Test URL: https://$HTTP_URL"
-        echo "🛢️ SQL Endpoint: tcp://$SQL_URL"
 
-    # --- CONNECTION VERIFICATION ---
-    - name: Verify connectivity
+    # --- EXECUTION ---
+    - name: Execute SQL
       run: |
-        echo "⏳ Please verify connection at: ${{ steps.tunnel.outputs.TEST_URL }}"
-        echo "Waiting 60 seconds for manual verification..."
-        sleep 60
-        
-        # Automated verification
-        if curl -s ${{ steps.tunnel.outputs.TEST_URL }} | grep -q "Directory listing"; then
-          echo "✅ Tunnel working"
-        else
-          echo "❌ Tunnel failed - check tunnel logs"
-          exit 1
-        fi
-
-    # --- SQL EXECUTION ---
-    - name: Execute SQL script
-      run: |
-        echo "Executing ${{ github.event.inputs.sql_file }}"
         sqlcmd -S "${{ steps.tunnel.outputs.SQL_HOST_PORT }}" \
                -U "$SQL_USER" \
                -P "$SQL_PASSWORD" \
                -i "${{ github.event.inputs.sql_file }}" \
                -o output.log \
-               -b  # Return error on T-SQL errors
+               -b -r 1  # Strict error handling
         
-        # Show execution results
         cat output.log
-        
-        # Fail if errors occurred
-        if grep -q "Msg [0-9]" output.log; then
-          echo "❌ SQL errors detected"
-          exit 1
-        fi
+        ! grep -q "Msg [0-9]" output.log
 
     # --- CLEANUP ---
     - name: Terminate tunnels
@@ -120,4 +119,4 @@ jobs:
       run: |
         pkill -f localtonet || true
         pkill -f "http.server" || true
-        echo "All tunnels terminated"
+        echo "Cleanup complete"
