@@ -1,108 +1,70 @@
-name: SQL Server CI via Localtonet
+name: Execute SQL Server Script from Repository
 
 on:
   workflow_dispatch:
     inputs:
-      sql_file:
-        description: 'Path to SQL script'
+      sql_file_path:
+        description: 'Path to SQL file in repository'
         required: true
         default: 'TestQuery.sql'
 
 env:
-  LOCALTONET_TOKEN: ${{ secrets.LOCALTONET_TOKEN }}
-  SQL_USER: ${{ secrets.SQL_USER }}
-  SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}
-  TEST_PORT: 5000
+  NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+  SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+  SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
 
 jobs:
-  sql-operation:
+  execute-sql:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
-    # --- INITIAL SETUP ---
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    # --- NUCLEAR OPTION: CLEAN ALL MICROSOFT CONFIGS ---
-    - name: Purge all Microsoft repo configurations
+      
+    - name: Install ngrok and dependencies
       run: |
-        sudo rm -f /etc/apt/sources.list.d/microsoft*
-        sudo rm -f /etc/apt/sources.list.d/msprod*
-        sudo rm -f /usr/share/keyrings/microsoft*
-        sudo rm -f /usr/share/keyrings/msprod*
-        sudo rm -f /etc/apt/trusted.gpg.d/microsoft*
-        echo "All Microsoft package configurations removed"
-
-    # --- FRESH MICROSOFT REPO SETUP ---
-    - name: Configure Microsoft repository (Ubuntu 24.04)
-      run: |
-        # Install prerequisites
-        sudo apt-get update
-        sudo apt-get install -y curl gnupg ca-certificates
+        curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+        sudo apt update && sudo apt install ngrok jq curl
         
-        # Create fresh keyring
-        sudo mkdir -p /usr/share/keyrings
-        curl https://packages.microsoft.com/keys/microsoft.asc | \
-          sudo gpg --dearmor -o /usr/share/keyrings/mssql-release.gpg
+    - name: Authenticate ngrok
+      run: ngrok authtoken $NGROK_AUTH_TOKEN
+      
+    - name: Start ngrok tunnel
+      run: |
+        nohup ngrok http 3000 --log=stdout > ngrok.log &
+        sleep 5  # Wait for ngrok to initialize
         
-        # Add repository with explicit overwrite
-        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/mssql-release.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | \
-          sudo tee /etc/apt/sources.list.d/mssql-release.list
+    - name: Get ngrok URL
+      id: ngrok
+      run: |
+        NGROK_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+        echo "NGROK_URL=${NGROK_URL}" >> $GITHUB_OUTPUT
+        echo "Public URL: ${NGROK_URL}"
         
-        # Verify configuration
-        ls -la /usr/share/keyrings/ | grep mssql
-        cat /etc/apt/sources.list.d/mssql-release.list
-
-    # --- PACKAGE INSTALLATION ---
-    - name: Install SQL Server tools
+    - name: Execute SQL script file
       run: |
-        sudo apt-get update
-        sudo apt-get install -y mssql-tools unixodbc-dev
-        echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-        source ~/.bashrc
-        sqlcmd -?  # Verify installation
-
-    # --- LOCALTONET SETUP ---
-    - name: Configure Localtonet
-      run: |
-        wget -q https://localtonet.com/download/linux -O localtonet
-        chmod +x localtonet
-        ./localtonet authtoken $LOCALTONET_TOKEN
-
-    # --- TUNNEL ESTABLISHMENT ---
-    - name: Establish tunnels
-      id: tunnel
-      run: |
-        python3 -m http.server $TEST_PORT > http.log 2>&1 &
-        ./localtonet tcp 1433 --hostname sql-$GITHUB_RUN_ID > sql_tunnel.log 2>&1 &
-        ./localtonet http $TEST_PORT --hostname test-$GITHUB_RUN_ID > http_tunnel.log 2>&1 &
-        sleep 10
+        # Basic auth for security
+        AUTH=$(echo -n "$SERVER_USERNAME:$SERVER_PASSWORD" | base64)
         
-        SQL_URL=$(grep -oP 'tcp://\K[^:]+' sql_tunnel.log)
-        HTTP_URL=$(grep -oP 'https://\K[^ ]+' http_tunnel.log)
+        # Send the SQL file to your local server
+        RESPONSE=$(curl -s -X POST \
+          "${{ steps.ngrok.outputs.NGROK_URL }}/execute-sql-file" \
+          -H "Authorization: Basic $AUTH" \
+          -F "sqlFile=@${{ github.event.inputs.sql_file_path }}")
         
-        echo "SQL_HOST_PORT=${SQL_URL}:1433" >> $GITHUB_OUTPUT
-        echo "TEST_URL=https://${HTTP_URL}" >> $GITHUB_OUTPUT
-        echo "SQL Endpoint: ${SQL_URL}:1433"
-        echo "Test URL: https://${HTTP_URL}"
-
-    # --- SQL EXECUTION ---
-    - name: Execute SQL script
-      run: |
-        sqlcmd -S "${{ steps.tunnel.outputs.SQL_HOST_PORT }}" \
-               -U "$SQL_USER" \
-               -P "$SQL_PASSWORD" \
-               -i "${{ github.event.inputs.sql_file }}" \
-               -o output.log \
-               -b -r 1
-        cat output.log
-        ! grep -q "Msg [0-9]" output.log
-
-    # --- CLEANUP ---
-    - name: Terminate tunnels
-      if: always()
-      run: |
-        pkill -f localtonet || true
-        pkill -f "http.server" || true
-        echo "All resources cleaned"
+        echo "Execution results:"
+        echo $RESPONSE | jq .
+        
+        # Fail the job if any command failed
+        if [ $(echo $RESPONSE | jq '.success') != 'true' ]; then
+          echo "SQL execution failed"
+          exit 1
+        fi
+        
+        # Check individual command results
+        FAILED_COMMANDS=$(echo $RESPONSE | jq '.results[] | select(.error)')
+        if [ "$FAILED_COMMANDS" != "" ]; then
+          echo "Some SQL commands failed:"
+          echo $FAILED_COMMANDS
+          exit 1
+        fi
