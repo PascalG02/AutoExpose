@@ -35,4 +35,4 @@ jobs:
           SQL_USERNAME: ${{ secrets.SQL_USERNAME }}      # e.g., sa
           SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}      # Your password
         run: |
-          sqlcmd -S $SQL_SERVER_URL -U $SQL_USERNAME -P $SQL_PASSWORD -d YourDatabaseName -i "${{ github.event.inputs.sql_script }}"
+          sqlcmd -S $SQL_SERVER_URL -U $SQL_USERNAME -P $SQL_PASSWORD -d master -i "${{ github.event.inputs.sql_script }}"
