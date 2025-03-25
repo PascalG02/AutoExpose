@@ -1,37 +1,41 @@
-name: SQL Automation with Dynamic SSH
+name: SQL Automation on Windows with PowerShell
 
-on: 
-  push:
-    branches:
-      - main
+on:
   workflow_dispatch:
+    inputs:
+      sql_script:
+        description: "Path to the SQL script to run"
+        required: true
+        default: "./scripts/setup-database.sql"
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest  # Windows runner for PowerShell compatibility
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Start Pinggy Tunnel via Dynamic SSH
+      - name: Start Pinggy Tunnel via PowerShell
         run: |
-          nohup ${{ secrets.PINGGY_SSH }} > pinggy_output.txt 2>&1 &
-          sleep 5  # Wait for Pinggy to initialize
+          Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
+          Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
 
       - name: Extract Pinggy Port
         run: |
-          PORT=$(grep -oP 'localhost:(\d+)' pinggy_output.txt | grep -oP '\d+')
-          echo "PINGGY_PORT=$PORT" >> $GITHUB_ENV
+          $port = Select-String -Path "pinggy_output.txt" -Pattern 'localhost:(\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
+          echo "PINGGY_PORT=$port" | Out-File -Append -FilePath $env:GITHUB_ENV
 
-      - name: Install SQLCMD tools
+      - name: Install SQLCMD Tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mssql-tools unixodbc-dev
-          echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
+          Invoke-WebRequest -Uri "https://aka.ms/getdbcodbc" -OutFile "msodbcsql.msi"
+          Start-Process msiexec.exe -ArgumentList "/i msodbcsql.msi /quiet /norestart" -Wait
+          Invoke-WebRequest -Uri "https://aka.ms/getsqlcmd" -OutFile "sqlcmd.msi"
+          Start-Process msiexec.exe -ArgumentList "/i sqlcmd.msi /quiet /norestart" -Wait
 
       - name: Run SQL Script
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S "localhost,${{ env.PINGGY_PORT }}" \
-          -U ${{ secrets.SQL_USER }} -P ${{ secrets.SQL_PASSWORD }} \
-          -i TestQuery.sql
+          & "C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe" `
+          -S "localhost,${{ env.PINGGY_PORT }}" `
+          -U ${{ secrets.SQL_USER }} -P ${{ secrets.SQL_PASSWORD }} `
+          -i "${{ inputs.sql_script }}"
