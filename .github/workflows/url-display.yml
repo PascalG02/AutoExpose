@@ -1,4 +1,4 @@
-name: Display Pinggy Tunnel TCP URL
+name: Display Pinggy Tunnel
 
 on:
   workflow_dispatch:
@@ -11,18 +11,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Start Pinggy Tunnel via PowerShell
+      - name: Start Pinggy Tunnel and Extract Port
         run: |
-          Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
-          Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
-
-      - name: Extract and Display Pinggy Tunnel TCP URL
-        run: |
-          $port = Select-String -Path "pinggy_output.txt" -Pattern 'localhost:(\d+)' | ForEach-Object { $_.Matches.Groups[1].Value }
+          $output = & "${{ secrets.PINGGY_SSH }}"
+          $port = ($output | Select-String -Pattern 'localhost:(\d+)').Matches.Groups[1].Value
           if ($port) {
-            $url = "tcp://localhost:$port"  # TCP URL format
-            Write-Host "::notice:: Tunnel TCP URL: $url"
-            echo "PINGGY_TCP_URL=$url" | Out-File -Append -FilePath $env:GITHUB_ENV
+            Write-Host "::notice:: Tunnel Port: $port"
           } else {
             Write-Host "::error:: Failed to detect Pinggy port."
             exit 1
