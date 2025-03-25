@@ -1,33 +1,39 @@
-name: Display Pinggy Tunnel Output
-
+name: Pinggy TCP Tunnel
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
-  deploy:
-    runs-on: windows-latest  # Windows runner for PowerShell compatibility
-
+  expose:
+    runs-on: windows-latest  # Required for PowerShell
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Start Pinggy TCP tunnel
+      id: pinggy
+      run: |
+        # Execute the Pinggy command and capture output
+        $pinggyCmd = "${{ secrets.PINGGY_SSH }}"
+        $output = (Invoke-Expression $pinggyCmd) 2>&1 | Out-String
 
-      - name: Start Pinggy Tunnel via PowerShell
-        run: |
-          Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
-          Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
+        # Extract TCP endpoint (modify pattern if needed)
+        $tcpUrl = $output | Select-String -Pattern 'tcp://[^\s]+' | ForEach-Object { $_.Matches.Value }
+        $tcpHost, $tcpPort = $tcpUrl -replace 'tcp://','' -split ':'
 
-      - name: Echo Pinggy Tunnel Output as Message
-        run: |
-          $output = Get-Content "pinggy_output.txt" | Out-String
-          Write-Host "::notice:: Pinggy Output: $output"
+        # Set outputs for other steps
+        Write-Output "TCP_HOST=$tcpHost" >> $env:GITHUB_OUTPUT
+        Write-Output "TCP_PORT=$tcpPort" >> $env:GITHUB_OUTPUT
+        Write-Output "TCP_URL=$tcpUrl" >> $env:GITHUB_OUTPUT
 
-      - name: Save Pinggy Output as Artifact
-        uses: actions/upload-artifact@v4  # Updated to v2
-        with:
-          name: pinggy-output
-          path: pinggy_output.txt
+        # Display in logs
+        Write-Host "##[group]Pinggy Tunnel Details"
+        Write-Host "TCP Endpoint: $tcpUrl"
+        Write-Host "Host: $tcpHost"
+        Write-Host "Port: $tcpPort"
+        Write-Host "##[endgroup]"
+      shell: pwsh
 
-      - name: Set Pinggy Output as Workflow Output
-        id: set_output
-        run: |
-          echo "PINGGY_OUTPUT=$(cat pinggy_output.txt)" >> $GITHUB_ENV
+    - name: Display tunnel information
+      run: |
+        Write-Host "Your TCP tunnel is active at:"
+        Write-Host "URL: ${{ steps.pinggy.outputs.TCP_URL }}"
+        Write-Host "Host: ${{ steps.pinggy.outputs.TCP_HOST }}"
+        Write-Host "Port: ${{ steps.pinggy.outputs.TCP_PORT }}"
+      shell: pwsh
