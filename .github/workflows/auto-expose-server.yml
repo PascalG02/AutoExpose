@@ -1,54 +1,38 @@
-name: SQL Automation on Windows with PowerShell
+name: SQL Execution
 
 on:
   workflow_dispatch:
     inputs:
       sql_script:
-        description: "Path to the SQL script to run"
+        description: 'Path to the SQL script'
         required: true
-        default: "./scripts/setup-database.sql"
+        type: string
 
 jobs:
-  deploy:
-    runs-on: windows-latest  # Windows runner for PowerShell compatibility
-
+  deploy-sql:
+    runs-on: ubuntu-latest
     steps:
+      # Checkout the repository to access the SQL script
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Start Pinggy Tunnel via PowerShell
+      # Install sqlcmd (Microsoft's SQL Server command-line tool)
+      - name: Install sqlcmd
         run: |
-          Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "${{ secrets.PINGGY_SSH }} | Out-File pinggy_output.txt"
-          Start-Sleep -Seconds 5  # Wait for Pinggy to initialize
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
+          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+          source ~/.bashrc
 
-      - name: Extract Pinggy URL and Port
+      # Run the specified SQL script against the tunneled SQL Server
+      - name: Execute SQL Script
+        env:
+          SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # e.g., tcp.pinggy.io:12345
+          SQL_USERNAME: ${{ secrets.SQL_USERNAME }}      # e.g., sa
+          SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}      # Your password
         run: |
-          $url = Select-String -Path "pinggy_output.txt" -Pattern '(\S+\.pinggy\.link),(\d+)' | ForEach-Object { "$($_.Matches.Groups[1].Value),$($_.Matches.Groups[2].Value)" }
-          if (-not $url) {
-            Write-Host "::error:: Failed to detect Pinggy tunnel URL. Check tunnel status."
-            exit 1
-          }
-          echo "PINGGY_URL=$url" | Out-File -Append -FilePath $env:GITHUB_ENV
-
-      - name: Add Firewall Rule for SQL Port
-        run: |
-          $port = $env:PINGGY_URL.Split(',')[1]
-          netsh advfirewall firewall add rule name="Allow SQL Server Port" dir=in action=allow protocol=TCP localport=$port
-
-      - name: Install SQLCMD Tools
-        run: |
-          Invoke-WebRequest -Uri "https://aka.ms/getdbcodbc" -OutFile "msodbcsql.msi"
-          Start-Process msiexec.exe -ArgumentList "/i msodbcsql.msi /quiet /norestart" -Wait
-          Invoke-WebRequest -Uri "https://aka.ms/getsqlcmd" -OutFile "sqlcmd.msi"
-          Start-Process msiexec.exe -ArgumentList "/i sqlcmd.msi /quiet /norestart" -Wait
-
-      - name: Verify SQLCMD Path
-        run: |
-          Get-Command sqlcmd -ErrorAction Continue
-
-      - name: Run SQL Script
-        run: |
-          & "C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe" `
-          -S "${{ env.PINGGY_URL }}" `
-          -U ${{ secrets.SQL_USER }} -P ${{ secrets.SQL_PASSWORD }} `
-          -i "${{ inputs.sql_script }}"
+          sqlcmd -S $SQL_SERVER_URL -U $SQL_USERNAME -P $SQL_PASSWORD -d YourDatabaseName -i "${{ github.event.inputs.sql_script }}"
