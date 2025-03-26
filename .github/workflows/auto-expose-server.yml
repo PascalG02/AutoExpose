@@ -9,14 +9,13 @@ on:
         type: string
 
 jobs:
-  deploy-sql:
+
+  install-sqlcmd:
     runs-on: ubuntu-latest
     steps:
-      # Checkout the repository to access the SQL script
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 
 
-      # Install sqlcmd and make it available in the PATH
       - name: Install sqlcmd
         run: |
           sudo apt-get update
@@ -25,14 +24,28 @@ jobs:
           curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
           sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
-          # Add mssql-tools to PATH for this session
           echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
 
-      # Run the specified SQL script against the master database
+  execute-sql:
+    runs-on: ubuntu-latest
+    needs: install-sqlcmd  # Depends on install-sqlcmd completing
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4  # Required again for the script file
+
+      - name: Install sqlcmd
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
+          echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
       - name: Execute SQL Script
         env:
-          SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # e.g., tcp.pinggy.io:12345
-          SQL_USERNAME: ${{ secrets.SQL_USER }}      
-          SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }} 
+          SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # tcp.pinggy.io:12345
+          SQL_USERNAME:   ${{ secrets.SQL_USER }}        # SQL Server username
+          SQL_PASSWORD:   ${{ secrets.SQL_PASSWORD }}    # SQL Server password
         run: |
-          sqlcmd -S "$SQL_SERVER_URL" -U "$SQL_USERNAME" -P "$SQL_PASSWORD" -d master -i "${{ github.event.inputs.sql_script }}"
+          sqlcmd -S "$SQL_SERVER_URL" -U "$SQL_USERNAME" -P "$SQL_PASSWORD" -d master -i "${{ github.event.inputs.sql_script }}" -b
