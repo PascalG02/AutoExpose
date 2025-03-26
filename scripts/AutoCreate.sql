@@ -37,7 +37,7 @@ GO
 -- Step 4: Insert Sample Data (no check, always runs)
 INSERT INTO Auto_User (Name, Email) 
 VALUES 
-    ('Alice Johnson', 'alice.johnson@example.com'),
-    ('Bob Smith', 'bob.smith@example.com'),
-    ('Charlie Brown', 'charlie.brown@example.com');
+    ('Alice Wonderland', 'alice.wonderland@imagine.com'),
+    ('Bobby bobs', 'bob.bob@bobbed.com'),
+    ('James Brown', 'james.brown@player.com');
 PRINT 'Sample data inserted.';
