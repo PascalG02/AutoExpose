@@ -32,7 +32,7 @@ jobs:
       - name: Execute SQL Script
         env:
           SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # e.g., tcp.pinggy.io:12345
-          SQL_USERNAME: ${{ secrets.SQL_USERNAME }}      # e.g., sa
-          SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}      # Your password
+          SQL_USERNAME: ${{ secrets.SQL_USER }}      
+          SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }} 
         run: |
           sqlcmd -S "$SQL_SERVER_URL" -U "$SQL_USERNAME" -P "$SQL_PASSWORD" -d master -i "${{ github.event.inputs.sql_script }}"
