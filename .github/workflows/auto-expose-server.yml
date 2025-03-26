@@ -1,4 +1,4 @@
-name: Manual SQL Deployment
+name: Auto SQL Deployment
 
 on:
   workflow_dispatch:
@@ -9,13 +9,11 @@ on:
         type: string
 
 jobs:
-
   install-sqlcmd:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4 
-
+        uses: actions/checkout@v4
       - name: Install sqlcmd
         run: |
           sudo apt-get update
@@ -24,27 +22,36 @@ jobs:
           curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
           sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
-          echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
+      - name: Upload sqlcmd and repo as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlcmd-and-repo
+          path: |
+            /opt/mssql-tools/
+            /etc/apt/sources.list.d/msprod.list
+            /usr/lib/libmsodbcsql-*
+            .
 
   execute-sql:
     runs-on: ubuntu-latest
-    needs: install-sqlcmd  # Depends on install-sqlcmd completing
+    needs: install-sqlcmd
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4  # Required again for the script file
-
-      - name: Install sqlcmd
+      - name: Download sqlcmd and repo artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sqlcmd-and-repo
+      - name: Set up sqlcmd environment
         run: |
+          sudo mv mssql-tools /opt/
+          sudo mv msprod.list /etc/apt/sources.list.d/
+          sudo mv libmsodbcsql-* /usr/lib/
           sudo apt-get update
-          sudo apt-get install -y curl gnupg
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
-          sudo apt-get update
-          sudo apt-get install -y mssql-tools unixodbc-dev
+          sudo apt-get install -y unixodbc-dev
           echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
+
       - name: Execute SQL Script
         env:
-          SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # tcp.pinggy.io:12345
+          SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # tcp.pinggy.io,12345
           SQL_USERNAME:   ${{ secrets.SQL_USER }}        # SQL Server username
           SQL_PASSWORD:   ${{ secrets.SQL_PASSWORD }}    # SQL Server password
         run: |
