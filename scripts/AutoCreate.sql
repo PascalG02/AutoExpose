@@ -2,7 +2,7 @@
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'Auto_DB')
 BEGIN
     CREATE DATABASE Auto_DB;
-    PRINT 'Database "Auto_DB" created successfully.';
+    PRINT 'Database "Auto_DB" created successfully';
 END
 ELSE
 BEGIN
@@ -25,11 +25,11 @@ BEGIN
         Email NVARCHAR(100) UNIQUE NOT NULL,
         CreatedAt DATETIME DEFAULT GETDATE()
     );
-    PRINT 'Table "Auto_User" created successfully.';
+    PRINT 'Table "Auto_User" created successfully and being initialised';
 END
 ELSE
 BEGIN
-    PRINT 'Table "Auto_User" already exists.';
+    PRINT 'Table "Auto_User" already exists';
 END
 
 GO
@@ -40,4 +40,4 @@ VALUES
     ('Alice Wonderland', 'alice.wonderland@imagine.com'),
     ('Bobby bobs', 'bob.bob@bobbed.com'),
     ('James Brown', 'james.brown@player.com');
-PRINT 'Sample data inserted.';
+PRINT 'Table data inserted.';
