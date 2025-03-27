@@ -35,7 +35,7 @@ END
 GO
 
 -- Step 4: Insert Sample Data (no check, always runs)
-INSERT INTO AutoDBPascalG (Name, Email) 
+INSERT INTO AutoUser (Name, Email) 
 VALUES 
     ('Alice Wonderland', 'alice.wonderland@imagine.com'),
     ('Bobby bobs', 'bob.bob@bobbed.com'),
