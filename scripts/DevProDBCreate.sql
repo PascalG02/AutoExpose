@@ -25,11 +25,11 @@ BEGIN
         Email NVARCHAR(100) UNIQUE NOT NULL,
         CreatedAt DATETIME DEFAULT GETDATE()
     );
-    PRINT 'Table "AutoDBPascalG" created successfully and being initialised';
+    PRINT 'Table "Auto_user" created successfully and being initialised';
 END
 ELSE
 BEGIN
-    PRINT 'Table "AutoDBPascalG" already exists';
+    PRINT 'Table "Auto_user" already exists';
 END
 
 GO
@@ -37,6 +37,7 @@ GO
 -- Step 4: Insert Sample Data (no check, always runs)
 INSERT INTO AutoUser (Name, Email) 
 VALUES 
+    ('Andile Ntumba', 'andile.ntumba@imagine.com'),
     ('Alice Wonderland', 'alice.wonderland@imagine.com'),
     ('Bobby bobs', 'bob.bob@bobbed.com'),
     ('James Brown', 'james.brown@player.com');
