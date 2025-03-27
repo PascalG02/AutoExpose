@@ -11,6 +11,7 @@ on:
 jobs:
   deploy-sql-dev:
     runs-on: ubuntu-latest
+    environment: development  # Tied to the 'development' environment for approval
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
