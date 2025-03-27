@@ -30,8 +30,8 @@ jobs:
       # Run the specified SQL script against the master database
       - name: Execute SQL Script
         env:
-          SQL_SERVER_URL: ${{ secrets.SQL_SERVER_URL }}  # e.g., tcp.pinggy.io:12345
-          SQL_USERNAME: ${{ secrets.SQL_USER }}      
-          SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }} 
+          SQL_SERVER_URL: ${{ secrets.DEV_SQL_SERVER_URL }}  # e.g., tcp.pinggy.io:12345
+          SQL_USERNAME: ${{ secrets.DEV_SQL_USER }}      
+          SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }} 
         run: |
           sqlcmd -S "$SQL_SERVER_URL" -U "$SQL_USERNAME" -P "$SQL_PASSWORD" -d master -i "${{ github.event.inputs.sql_script }}"
