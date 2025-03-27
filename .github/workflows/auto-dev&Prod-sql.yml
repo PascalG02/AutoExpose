@@ -1,4 +1,4 @@
-name: SQL Deployment
+name: SQL DevProd Deployment
 
 on:
   workflow_dispatch:
