@@ -1,18 +1,18 @@
 -- Step 1: Create Database if it doesn't exist
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'AutoDB_PG_Mar27')
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'AutoDB_Pascal')
 BEGIN
-    CREATE DATABASE AutoDB_PG_Mar27;
-    PRINT 'Database "AutoDB_PG_Mar27" created successfully';
+    CREATE DATABASE AutoDB_Pascal;
+    PRINT 'Database "AutoDB_Pascal" created successfully';
 END
 ELSE
 BEGIN
-    PRINT 'Database "AutoDB_PG_Mar27" already exists.';
+    PRINT 'Database "AutoDB_Pascal" already exists.';
 END
 
 GO
 
 -- Step 2: Use the new database
-USE AutoDB_PG_Mar27;
+USE AutoDB_Pascal;
 
 GO
 
