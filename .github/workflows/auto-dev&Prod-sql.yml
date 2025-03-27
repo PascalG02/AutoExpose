@@ -9,7 +9,7 @@ on:
         type: string
 
 jobs:
-  deploy-sql-dev:
+  develop-env:
     runs-on: ubuntu-latest
     environment: development  # Tied to the 'development' environment for approval
     steps:
@@ -39,9 +39,9 @@ jobs:
           fi
           echo "Development deployment succeeded"
 
-  deploy-sql-prod:
+  production-env:
     runs-on: ubuntu-latest
-    needs: deploy-sql-dev  # Wait for dev deployment to succeed
+    needs: develop-env  # Wait for dev deployment to succeed
     environment: production  # Tied to the 'production' environment for approval
     steps:
       - name: Checkout repository
