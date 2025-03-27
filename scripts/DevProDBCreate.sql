@@ -25,17 +25,17 @@ BEGIN
         Email NVARCHAR(100) UNIQUE NOT NULL,
         CreatedAt DATETIME DEFAULT GETDATE()
     );
-    PRINT 'Table "Auto_user" created successfully and being initialised';
+    PRINT 'Table "Auto_User" created successfully and being initialised';
 END
 ELSE
 BEGIN
-    PRINT 'Table "Auto_user" already exists';
+    PRINT 'Table "Auto_User" already exists';
 END
 
 GO
 
 -- Step 4: Insert Sample Data (no check, always runs)
-INSERT INTO AutoUser (Name, Email) 
+INSERT INTO Auto_User (Name, Email) 
 VALUES 
     ('Andile Ntumba', 'andile.ntumba@imagine.com'),
     ('Alice Wonderland', 'alice.wonderland@imagine.com'),
