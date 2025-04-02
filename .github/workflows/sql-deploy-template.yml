@@ -1,0 +1,47 @@
+name: SQL Deployment Template
+
+on:
+  workflow_call:
+    inputs:
+      sql_script:
+        description: 'Path to the SQL script'
+        required: true
+        type: string
+      environment_name:
+        description: 'Target environment (dev/prod)'
+        required: true
+        type: string
+    secrets:
+      SQL_SERVER_URL:
+        required: true
+      SQL_USERNAME:
+        required: true
+      SQL_PASSWORD:
+        required: true
+
+jobs:
+  deploy-sql:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install sqlcmd
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
+          echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
+
+      - name: Execute SQL Script
+        run: |
+          sqlcmd -S "${{ secrets.SQL_SERVER_URL }}" -U "${{ secrets.SQL_USERNAME }}" -P "${{ secrets.SQL_PASSWORD }}" -d master -i "${{ inputs.sql_script }}" -b
+          if [ $? -ne 0 ]; then
+            echo "${{ inputs.environment_name }} deployment failed"
+            exit 1
+          fi
+          echo "${{ inputs.environment_name }} deployment succeeded"
