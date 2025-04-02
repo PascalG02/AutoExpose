@@ -1,4 +1,4 @@
-name: SQL DevProd Deployment
+name: SQL DevProd TempDeployment
 
 on:
   workflow_dispatch:
