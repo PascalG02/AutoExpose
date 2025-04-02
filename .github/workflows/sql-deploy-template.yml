@@ -20,7 +20,7 @@ on:
         required: true
 
 jobs:
-  deploy-sql:
+  DeploySQL:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment_name }}
     steps:
