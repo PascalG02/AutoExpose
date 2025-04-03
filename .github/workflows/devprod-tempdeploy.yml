@@ -1,4 +1,4 @@
-name: SQL DevProd TempDeployment
+name: SQL DevProd CallerDeploy
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   DeveloperEnv:
-    uses: ./.github/workflows/sql-deploy-template.yml
+    uses: ./.github/workflows/sql-deployment-template.yml
     with:
       sql_script: ${{ github.event.inputs.sql_script }}
       environment_name: development
@@ -18,11 +18,11 @@ jobs:
       SQL_SERVER_URL: ${{ secrets.DEV_SQL_SERVER_URL }}
       SQL_USERNAME: ${{ secrets.DEV_SQL_USER }}
       SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
 
-
-  ProductionEnv:
+  ProducationEnv:
     needs: DeveloperEnv
-    uses: ./.github/workflows/sql-deploy-template.yml
+    uses: ./.github/workflows/sql-deployment-template.yml
     with:
       sql_script: ${{ github.event.inputs.sql_script }}
       environment_name: production
@@ -30,4 +30,5 @@ jobs:
       SQL_SERVER_URL: ${{ secrets.PROD_SQL_SERVER_URL }}
       SQL_USERNAME: ${{ secrets.PROD_SQL_USER }}
       SQL_PASSWORD: ${{ secrets.PROD_SQL_PASSWORD }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
       
