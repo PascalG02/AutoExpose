@@ -10,7 +10,7 @@ on:
 
 jobs:
   DeveloperEnv:
-    uses: ./.github/workflows/sql-deployment-template.yml
+    uses: ./.github/workflows/sql-deploy-template.yml
     with:
       sql_script: ${{ github.event.inputs.sql_script }}
       environment_name: development
@@ -22,7 +22,7 @@ jobs:
 
   ProducationEnv:
     needs: DeveloperEnv
-    uses: ./.github/workflows/sql-deployment-template.yml
+    uses: ./.github/workflows/sql-deploy-template.yml
     with:
       sql_script: ${{ github.event.inputs.sql_script }}
       environment_name: production
