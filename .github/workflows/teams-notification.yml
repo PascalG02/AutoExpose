@@ -29,7 +29,7 @@ jobs:
         with:
           webhookUrl: ${{ secrets.webhookUrl }}
           title: "SQL Deployment Update: ${{ inputs.environment_name }}"
-          titleBackgroundColor: ${{ inputs.status == 'success' && '#28a745' || '#dc3545' }}  # Green or Red
+          titleBackgroundColor: 'success'  # Green or Red
           status: ${{ inputs.status == 'success' && 'Deployed' || 'Failed' }}
           message: >-
             **${{ inputs.status == 'success' && '🎉 Success' || '⚠️ Failure' }}**
