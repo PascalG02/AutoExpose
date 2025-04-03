@@ -18,6 +18,8 @@ on:
         required: true
       SQL_PASSWORD:
         required: true
+      TEAMS_WEBHOOK_URL:
+        required: true
 
 jobs:
   DeploySQL:
