@@ -1,0 +1,42 @@
+name: Teams Notification
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        description: 'Environment that was deployed to'
+        required: true
+        type: string
+      sql_script:
+        description: 'Path to the SQL script that was deployed'
+        required: true
+        type: string
+      status:
+        description: 'Deployment status (success/failure)'
+        required: true
+        type: string
+    secrets:
+      webhookUrl:
+        description: 'Teams webhook URL'
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Teams
+        uses: neonidian/teams-notify-build-status@v3
+        with:
+          webhookUrl: ${{ secrets.webhookUrl }}
+          title: "SQL Deployment Update: ${{ inputs.environment_name }}"
+          titleBackgroundColor: ${{ inputs.status == 'success' && '#28a745' || '#dc3545' }}  # Green or Red
+          status: ${{ inputs.status == 'success' && 'Deployed' || 'Failed' }}
+          message: >-
+            **${{ inputs.status == 'success' && '🎉 Success' || '⚠️ Failure' }}**
+            - Environment: `${{ inputs.environment_name }}`
+            - Script: `${{ inputs.sql_script }}`
+            - By: ${{ github.actor }}
+            - [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        env:
+          SHOULD_DISPLAY_ACTOR_LABEL: false
+          SHOULD_DISPLAY_VIEW_RUN_BUTTON: false
