@@ -28,19 +28,18 @@ jobs:
         uses: neonidian/teams-notify-build-status@v3
         with:
           webhookUrl: ${{ secrets.webhookUrl }}
-          title: "SQL Deployment Update: ${{ inputs.environment_name }}"
-          titleBackgroundColor: 'success'  # Green or Red
+          title: "🚀 Deployment Complete! Environment: ${{ inputs.environment_name }}"
+          titleBackgroundColor: 'green'
           status: 'Deployed'
           message: >-
-            ** 'success' && '🎉 Success' Deployment Notification**
-            ---------------------------------
-            - Environment: `${{ inputs.environment_name }}`
-            
-            - Script: `${{ inputs.sql_script }}`
-            
-            - By: ${{ github.actor }}
-            
-            - [View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            🎊 **SQL Deployment Just Landed!** 🎊
+            -------------------------------------------
+            ✅ **Environment:** `${{ inputs.environment_name }}`  
+            📄 **Script Deployed:** `${{ inputs.sql_script }}`  
+            🧑‍💻 **Deployed by:** `${{ github.actor }}`  
+            🔗 **[Check out the Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**
+
+            🥳 SQL Script successfully deployed!!
         env:
           SHOULD_DISPLAY_ACTOR_LABEL: true
           SHOULD_DISPLAY_VIEW_RUN_BUTTON: true
