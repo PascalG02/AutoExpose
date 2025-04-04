@@ -1,7 +1,9 @@
 This folder stores the different workflows/GitHub actions used in the SQL Deployment Project.
 
 PHASE 1 - Auto Deploy SQL script to create a database , a table and insert values. Make use of a tunnel service and create a user to log remotely.
+
 PHASE 2- Advance the workflow to now include environments (Developer and Production), you and your AP. It should deploy the script to both services and have a request in between deployments.
+
 PHASE 3- To avoid repitition in workflow, create a template and call workflow to do phase 2. Also add try/catch statements.
 
 
