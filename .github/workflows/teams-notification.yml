@@ -34,9 +34,13 @@ jobs:
           message: >-
             🎊 **SQL Deployment Just Landed!** 🎊
             -------------------------------------------
-            ✅ **Environment:** `${{ inputs.environment_name }}`  
+            
+            ✅ **Environment:** `${{ inputs.environment_name }}` 
+            
             📄 **Script Deployed:** `${{ inputs.sql_script }}`  
+            
             🧑‍💻 **Deployed by:** `${{ github.actor }}`  
+            
             🔗 **[Check out the Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})**
 
             🥳 SQL Script successfully deployed!!
