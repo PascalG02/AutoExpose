@@ -30,9 +30,9 @@ jobs:
           webhookUrl: ${{ secrets.webhookUrl }}
           title: "SQL Deployment Update: ${{ inputs.environment_name }}"
           titleBackgroundColor: 'success'  # Green or Red
-          status: ${{ inputs.status == 'success' && 'Deployed'}} 
+          status: 'Deployed'
           message: >-
-            **${{ inputs.status == 'success' && '🎉 Success' }} Deployment Notification**
+            ** 'success' && '🎉 Success' Deployment Notification**
             ---------------------------------
             - Environment: `${{ inputs.environment_name }}`
             
@@ -42,5 +42,5 @@ jobs:
             
             - [View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
         env:
-          SHOULD_DISPLAY_ACTOR_LABEL: false
-          SHOULD_DISPLAY_VIEW_RUN_BUTTON: false
+          SHOULD_DISPLAY_ACTOR_LABEL: true
+          SHOULD_DISPLAY_VIEW_RUN_BUTTON: true
