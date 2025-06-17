@@ -39,7 +39,7 @@ jobs:
       - name: Deploy SSIS Package
         run: |
           cd "${{ github.workspace }}"
-          echo Deploying to -d:CATALOG;/SSISDB/Timesheet;${{ secrets.DEV_SQL_SERVER_URL }}
+          echo Deploying to -d:CATALOG;/SSISDB/TimesheetMigrationPacks;${{ secrets.DEV_SQL_SERVER_URL }}
           SSISDeploy.exe -s:Timesheet\build\Development\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/Timesheet;${{ secrets.DEV_SQL_SERVER_URL }} -authType:SQL -u:${{ secrets.DEV_SQL_USER }} -p:${{ secrets.DEV_SQL_PASSWORD }} -l:INFO;deploy.log
         shell: cmd
 
