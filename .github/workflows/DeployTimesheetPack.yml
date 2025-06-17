@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  SSIS_FOLDER: "TimesheetMigrationPacks"
+  SSIS_PROJECT: "TimesheetMigrationV2"
+
 jobs:
   build-and-deploy:
     runs-on: self-hosted
@@ -21,7 +25,7 @@ jobs:
 
       # Verify the .dtproj file exists
       - name: Check dtproj file
-        run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
+        run: if not exist "${{ github.workspace }}\Timesheet\${{ env.SSIS_PROJECT }}.dtproj" exit /b 1
         shell: cmd
 
       # Install SSIS DevOps Tools
@@ -32,32 +36,38 @@ jobs:
       - name: Build SSIS Project
         run: |
           cd "${{ github.workspace }}"
-          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build\Development -ss -l:INFO;build.log
-        shell: cmd
+          SSISBuild.exe `
+            -p:Timesheet\${{ env.SSIS_PROJECT }}.dtproj `
+            -o:build\Development `
+            -ss `
+            -l:INFO;build.log
+        shell: powershell
 
       # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
         run: |
-          cd "${{ github.workspace }}"
-          echo Deploying to -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }}
-          SSISDeploy.exe -s:build\Development\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }} -authType:WIN -l:INFO;deploy.log
-        shell: cmd
+          $ispacPath = "${{ github.workspace }}\build\Development\${{ env.SSIS_PROJECT }}.ispac"
+          $deployTarget = "CATALOG;/SSISDB/${{ env.SSIS_FOLDER }}/${{ env.SSIS_PROJECT }};${{ secrets.DEV_SQL_SERVER_URL }}"
+          
+          Write-Host "Deploying $ispacPath to $deployTarget"
+          SSISDeploy.exe `
+            -s:$ispacPath `
+            -d:$deployTarget `
+            -authType:WIN `
+            -l:INFO;deploy.log
+          
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "Deployment failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+        shell: powershell
 
-      # Optional: Archive the .ispac file and logs as artifacts
-      - name: Upload ISPAC Artifact
+      # Upload artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ssis-deployment-package
-          path: ${{ github.workspace }}\build\Development\TimesheetMigrationV2.ispac
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: ${{ github.workspace }}\build.log
-
-      - name: Upload Deploy Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: deploy-log
-          path: ${{ github.workspace }}\deploy.log
+          name: ssis-artifacts
+          path: |
+            ${{ github.workspace }}\build\Development\${{ env.SSIS_PROJECT }}.ispac
+            ${{ github.workspace }}\build.log
+            ${{ github.workspace }}\deploy.log
