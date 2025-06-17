@@ -50,6 +50,8 @@ jobs:
           $bytes = [System.IO.File]::ReadAllBytes($ispacPath)
           $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
 
+          # Write T-SQL script to a temporary file
+          $sqlFile = Join-Path ${PWD} "deploy_script.sql"
           $sql = @"
           DECLARE @project_binary VARBINARY(MAX) = 0x$hex
           BEGIN TRY
@@ -66,11 +68,14 @@ jobs:
           PRINT 'ERROR: ' + ERROR_MESSAGE()
           THROW
           END CATCH
-          "@
+          "@ | Out-File -FilePath $sqlFile -Encoding UTF8
 
-          # Run sqlcmd and check exit code
-          sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -Q "$sql" -o "deploy.log"
+          # Run sqlcmd with the script file
+          sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -i $sqlFile -o "deploy.log"
           if ($LASTEXITCODE -ne 0) {
             throw "sqlcmd failed with exit code $LASTEXITCODE. Check deploy.log for details."
           }
+
+          # Clean up temporary file
+          Remove-Item $sqlFile -Force
         shell: powershell
