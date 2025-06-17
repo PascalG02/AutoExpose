@@ -38,7 +38,7 @@ jobs:
       # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
         run: |
-          SSISDeploy.exe build\TimesheetMigrationV2.ispac -Catalog SSISDB -Server "${{ secrets.SQL_SERVER_NAME }}" -User "${{ secrets.SQL_SERVER_USER }}" -Password "${{ secrets.SQL_SERVER_PASSWORD }}"
+          SSISDeploy.exe build\TimesheetMigrationV2.ispac -Catalog SSISDB -Server "${{ secrets.DEV_SQL_SERVER_URL }}" -User "${{ secrets.DEV_SQL_USER }}" -Password "${{ secrets.DEV_SQL_PASSWORD }}"
         shell: cmd
 
       # Optional: Archive the .ispac file and log as artifacts
