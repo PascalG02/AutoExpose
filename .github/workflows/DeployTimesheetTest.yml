@@ -47,8 +47,10 @@ jobs:
           if (-not (Test-Path $ispacPath)) {
             throw "ISPAC file not found at $ispacPath"
           }
+          Write-Host "ISPAC file found at: $ispacPath"
           $bytes = [System.IO.File]::ReadAllBytes($ispacPath)
           $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
+          Write-Host "Hex string length: $($hex.Length) characters"
 
           # Write T-SQL script to a temporary file
           $sqlFile = Join-Path ${PWD} "deploy_script.sql"
@@ -62,7 +64,7 @@ jobs:
             @folder_name = 'TimesheetMigrationPacks',
             @project_name = 'TimesheetMigrationV2',
             @project_stream = @project_binary
-          PRINT 'Deployment successful'
+          PRINT 'Deployment successful to server: $env:SQL_SERVER, folder: TimesheetMigrationPacks, project: TimesheetMigrationV2'
           END TRY
           BEGIN CATCH
           PRINT 'ERROR: ' + ERROR_MESSAGE()
@@ -71,6 +73,7 @@ jobs:
           "@ | Out-File -FilePath $sqlFile -Encoding UTF8
 
           # Run sqlcmd with the script file
+          Write-Host "Executing sqlcmd against $env:SQL_SERVER with user $env:SQL_USER"
           sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -i $sqlFile -o "deploy.log"
           if ($LASTEXITCODE -ne 0) {
             throw "sqlcmd failed with exit code $LASTEXITCODE. Check deploy.log for details."
@@ -79,3 +82,22 @@ jobs:
           # Clean up temporary file
           Remove-Item $sqlFile -Force
         shell: powershell
+
+      # Optional: Archive the .ispac file and logs as artifacts
+      - name: Upload ISPAC Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssis-deployment-package
+          path: ${{ github.workspace }}\build\Development\TimesheetMigrationV2.ispac
+
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ${{ github.workspace }}\build.log
+
+      - name: Upload Deploy Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-log
+          path: ${{ github.workspace }}\deploy.log
