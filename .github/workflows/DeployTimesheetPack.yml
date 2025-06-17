@@ -24,9 +24,15 @@ jobs:
         run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
         shell: cmd
 
-      # Install SSIS DevOps Tools
+      # Debug: Check PowerShell version
+      - name: Check PowerShell Version
+        run: $PSVersionTable.PSVersion
+        shell: powershell
+
+      # Install SSIS DevOps Tools with explicit PowerShell shell
       - name: Setup SSIS DevOps Tools
         uses: jonlabelle/setup-ssis-devops-tools@v1
+        shell: powershell
 
       # Build SSIS project to generate .ispac file
       - name: Build SSIS Project
