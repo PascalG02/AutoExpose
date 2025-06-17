@@ -48,13 +48,13 @@ jobs:
           fi
           echo "${{ inputs.environment_name }} deployment succeeded"
 
-  notify-teams:
-    needs: DeploySQL
-    uses: ./.github/workflows/teams-notification.yml
-    with:
-      environment_name: ${{ inputs.environment_name }}
-      sql_script: ${{ inputs.sql_script }}
-      status: ${{ needs.deploy-sql.outputs.status }}
-    secrets:
-      webhookUrl: ${{ secrets.TEAMS_WEBHOOK_URL }}
+  # notify-teams:
+  #   needs: DeploySQL
+  #   uses: ./.github/workflows/teams-notification.yml
+  #   with:
+  #     environment_name: ${{ inputs.environment_name }}
+  #     sql_script: ${{ inputs.sql_script }}
+  #     status: ${{ needs.deploy-sql.outputs.status }}
+  #   secrets:
+  #     webhookUrl: ${{ secrets.TEAMS_WEBHOOK_URL }}
     
