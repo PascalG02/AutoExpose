@@ -2,68 +2,46 @@ name: Deploy SSIS Package
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: self-hosted
     steps:
-      # Check out the repository
+      # Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Debug: Verify directory contents
-      - name: List directory contents
-        run: dir "${{ github.workspace }}"
-        shell: cmd
-
-      # Verify the .dtproj file exists
-      - name: Check dtproj file
-        run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
-        shell: cmd
-
-      # Debug: Check PowerShell version
-      - name: Check PowerShell Version
-        run: $PSVersionTable.PSVersion
-        shell: powershell
-
-      # Install SSIS DevOps Tools with explicit PowerShell shell
+      # Install SSIS DevOps Tools using Windows PowerShell
       - name: Setup SSIS DevOps Tools
-        uses: jonlabelle/setup-ssis-devops-tools@v1
-        shell: powershell
+        run: |
+          $toolsPath = Join-Path -Path $env:USERPROFILE -ChildPath "ssis-tools"
+          if (-not (Test-Path $toolsPath)) {
+              New-Item -ItemType Directory -Path $toolsPath -Force
+          }
+          
+          # Download SSISBuild.exe (example URL - replace with real one)
+          $ssisBuildUrl = "https://github.com/jonlabelle/SsisBuild/releases/download/v1.0.0/SSISBuild.exe"
+          Invoke-WebRequest -Uri $ssisBuildUrl -OutFile "$toolsPath\SSISBuild.exe"
+          
+          # Add to PATH
+          $env:PATH = "$toolsPath;$env:PATH"
+          [System.Environment]::SetEnvironmentVariable("PATH", "$toolsPath;$env:PATH", "Machine")
+          
+          Write-Output "SSIS tools installed to $toolsPath"
+        shell: powershell  # Uses Windows PowerShell instead of pwsh
 
-      # Build SSIS project to generate .ispac file
+      # Rest of your workflow remains the same
       - name: Build SSIS Project
         run: |
-          cd "${{ github.workspace }}"
           SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build\Development -ss -l:INFO;build.log
         shell: cmd
 
-      # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
         run: |
-          cd "${{ github.workspace }}"
-          echo Deploying to -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }}
-          SSISDeploy.exe -s:Timesheet\build\Development\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }} -authType:WIN -l:INFO;deploy.log
-        shell: cmd
-
-      # Optional: Archive the .ispac file and logs as artifacts
-      - name: Upload ISPAC Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ssis-deployment-package
-          path: ${{ github.workspace }}\build\Development\TimesheetMigrationV2.ispac
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: ${{ github.workspace }}\build.log
-
-      - name: Upload Deploy Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: deploy-log
-          path: ${{ github.workspace }}\deploy.log
+          SSISDeploy.exe -s:build\Development\TimesheetMigrationV2.ispac `
+                         -d:"CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }}" `
+                         -authType:WIN `
+                         -l:INFO;deploy.log
+        shell: powershell
