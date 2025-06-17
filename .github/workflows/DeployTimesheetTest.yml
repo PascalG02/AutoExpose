@@ -43,7 +43,7 @@ jobs:
           SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
         run: |
           cd "${{ github.workspace }}"
-          $ispacPath = Join-Path ${PWD} "build\Development\TimesheetMigrationV2.ispac"
+          $ispacPath = Join-Path ${PWD} "Timesheet\build\Development\TimesheetMigrationV2.ispac"
           if (-not (Test-Path $ispacPath)) {
             throw "ISPAC file not found at $ispacPath"
           }
