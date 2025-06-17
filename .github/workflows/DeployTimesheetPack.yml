@@ -1,0 +1,28 @@
+name: Deploy SSIS Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+      # Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install SSIS DevOps Tools
+      - name: Setup SSIS DevOps Tools
+        uses: jonlabelle/setup-ssis-devops-tools@v1
+
+      # Build SSIS project to generate .ispac file
+      - name: Build SSIS Project
+        run: |
+          SSISBuild.exe "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" -Configuration Release -OutputFolder "${{ github.workspace }}\build" -ProtectionLevel DontSaveSensitive
+        shell: cmd
+
+      # Deploy .ispac file to SSIS Catalog
+      - name: Deploy SSIS Package
+        run: |
+          SSISDeploy.exe "${{ github.workspace }}\build\TimesheetMigrationV2.ispac" -Catalog SSISDB -Server "${{ secrets.SQL_SERVER_NAME }}" -User "${{ secrets.SQL_SERVER_USER }}" -Password "${{ secrets.SQL_SERVER_PASSWORD }}"
+        shell: cmd
