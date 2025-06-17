@@ -1,4 +1,3 @@
-
 name: Deploy SSIS Package
 
 on:
@@ -33,7 +32,7 @@ jobs:
       - name: Build SSIS Project
         run: |
           cd "${{ github.workspace }}"
-          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -ss -l:INFO;build.log
+          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build\Development -ss -l:INFO;build.log
         shell: cmd
 
       # Deploy .ispac file to SSIS Catalog
@@ -41,7 +40,7 @@ jobs:
         run: |
           cd "${{ github.workspace }}"
           echo Deploying to -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }}
-          SSISDeploy.exe -s:Timesheet\build\Development\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }} -authType:WIN -l:INFO;deploy.log
+          SSISDeploy.exe -s:build\Development\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;${{ secrets.DEV_SQL_SERVER_URL }} -authType:WIN -l:INFO;deploy.log
         shell: cmd
 
       # Optional: Archive the .ispac file and logs as artifacts
@@ -49,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ssis-deployment-package
-          path: ${{ github.workspace }}\build\TimesheetMigrationV2.ispac
+          path: ${{ github.workspace }}\build\Development\TimesheetMigrationV2.ispac
 
       - name: Upload Build Log
         uses: actions/upload-artifact@v4
