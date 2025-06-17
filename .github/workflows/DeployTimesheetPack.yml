@@ -38,10 +38,11 @@ jobs:
       # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
         run: |
-          SSISDeploy.exe build\TimesheetMigrationV2.ispac -Catalog SSISDB -Server "${{ secrets.DEV_SQL_SERVER_URL }}" -User "${{ secrets.DEV_SQL_USER }}" -Password "${{ secrets.DEV_SQL_PASSWORD }}"
+          cd "${{ github.workspace }}"
+          SSISDeploy.exe -s:build\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/Timesheet -authType:SQL -u:${{ secrets.DEV_SQL_USER }} -p:${{ secrets.DEV_SQL_PASSWORD }} -server:${{ secrets.DEV_SQL_SERVER_URL }} -l:INFO;deploy.log
         shell: cmd
 
-      # Optional: Archive the .ispac file and log as artifacts
+      # Optional: Archive the .ispac file and logs as artifacts
       - name: Upload ISPAC Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -53,3 +54,9 @@ jobs:
         with:
           name: build-log
           path: ${{ github.workspace }}\build.log
+
+      - name: Upload Deploy Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-log
+          path: ${{ github.workspace }}\deploy.log
