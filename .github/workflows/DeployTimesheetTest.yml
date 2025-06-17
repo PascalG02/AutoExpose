@@ -52,27 +52,18 @@ jobs:
           $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
           Write-Host "Hex string length: $($hex.Length) characters"
 
-          # Write T-SQL script to a temporary file
-          $sqlFile = Join-Path ${PWD} "deploy_script.sql"
-          $sql = @"
-          DECLARE @project_binary VARBINARY(MAX) = 0x$hex
-          BEGIN TRY
-          IF EXISTS (SELECT 1 FROM [SSISDB].[catalog].[projects] WHERE [name] = 'TimesheetMigrationV2')
-            EXEC [SSISDB].[catalog].[delete_project] 'TimesheetMigrationPacks', 'TimesheetMigrationV2'
-          
-          EXEC [SSISDB].[catalog].[deploy_project] 
-            @folder_name = 'TimesheetMigrationPacks',
-            @project_name = 'TimesheetMigrationV2',
-            @project_stream = @project_binary
-          PRINT 'Deployment successful to server: $env:SQL_SERVER, folder: TimesheetMigrationPacks, project: TimesheetMigrationV2'
-          END TRY
-          BEGIN CATCH
-          PRINT 'ERROR: ' + ERROR_MESSAGE()
-          THROW
-          END CATCH
-          "@ | Out-File -FilePath $sqlFile -Encoding UTF8
+          # Read and modify the SQL script
+          $sqlScriptPath = Join-Path ${PWD} "scripts\DeploySSIS.sql"
+          if (-not (Test-Path $sqlScriptPath)) {
+            throw "SQL script not found at $sqlScriptPath"
+          }
+          $sqlContent = Get-Content -Path $sqlScriptPath -Raw
+          $sqlContent = $sqlContent -replace 'SET @project_binary = 0x;', "SET @project_binary = 0x$hex;"
 
-          # Run sqlcmd with the script file
+          # Write the updated SQL script to a file and execute
+          $sqlFile = Join-Path ${PWD} "deploy_script.sql"
+          $sqlContent | Out-File -FilePath $sqlFile -Encoding UTF8
+
           Write-Host "Executing sqlcmd against $env:SQL_SERVER with user $env:SQL_USER"
           sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -i $sqlFile -o "deploy.log"
           if ($LASTEXITCODE -ne 0) {
@@ -88,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ssis-deployment-package
-          path: ${{ github.workspace }}\build\Development\TimesheetMigrationV2.ispac
+          path: ${{ github.workspace }}\Timesheet\build\Development\TimesheetMigrationV2.ispac
 
       - name: Upload Build Log
         uses: actions/upload-artifact@v4
