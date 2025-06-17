@@ -19,6 +19,11 @@ jobs:
         run: dir "${{ github.workspace }}"
         shell: cmd
 
+      # Verify the .dtproj file exists
+      - name: Check dtproj file
+        run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
+        shell: cmd
+
       # Install SSIS DevOps Tools
       - name: Setup SSIS DevOps Tools
         uses: jonlabelle/setup-ssis-devops-tools@v1
@@ -27,13 +32,13 @@ jobs:
       - name: Build SSIS Project
         run: |
           cd "${{ github.workspace }}"
-          SSISBuild.exe -p "Timesheet\TimesheetMigrationV2.dtproj" -c "Release" -o "build" -ss
+          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -c:Release -o:build -ss
         shell: cmd
 
       # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
         run: |
-          SSISDeploy.exe "build\TimesheetMigrationV2.ispac" -Catalog SSISDB -Server "${{ secrets.SQL_SERVER_NAME }}" -User "${{ secrets.SQL_SERVER_USER }}" -Password "${{ secrets.SQL_SERVER_PASSWORD }}"
+          SSISDeploy.exe build\TimesheetMigrationV2.ispac -Catalog SSISDB -Server "${{ secrets.SQL_SERVER_NAME }}" -User "${{ secrets.SQL_SERVER_USER }}" -Password "${{ secrets.SQL_SERVER_PASSWORD }}"
         shell: cmd
 
       # Optional: Archive the .ispac file as an artifact
