@@ -2,97 +2,75 @@ name: Deploy SSIS Package TEST
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: windows-latest
     steps:
+      # Check out the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate files exist
-        shell: pwsh
-        run: |
-          $dtprojPath = "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj"
-          if (-not (Test-Path $dtprojPath)) {
-              Write-Error "Missing .dtproj file at $dtprojPath"
-              exit 1
-          }
+      # Debug: Verify directory contents
+      - name: List directory contents
+        run: dir "${{ github.workspace }}"
+        shell: cmd
 
+      # Verify the .dtproj file exists
+      - name: Check dtproj file
+        run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
+        shell: cmd
+
+      # Install SSIS DevOps Tools
       - name: Setup SSIS DevOps Tools
         uses: jonlabelle/setup-ssis-devops-tools@v1
 
+      # Build SSIS project to generate .ispac file
       - name: Build SSIS Project
-        shell: pwsh
         run: |
-          $buildLogPath = "${{ github.workspace }}\build.log"
-          SSISBuild.exe -p:"${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" `
-                       -o:"${{ github.workspace }}\build" `
-                       -ss `
-                       -l:"INFO;$buildLogPath"
-          
-          # Fail if build failed
-          if ($LASTEXITCODE -ne 0) {
-              Get-Content $buildLogPath | Write-Error
-              exit 1
-          }
+          cd "${{ github.workspace }}"
+          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -c:Development -o:build -ss -l:INFO;build.log
+        shell: cmd
 
+      # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
-        shell: pwsh
         env:
           SQL_SERVER: ${{ secrets.DEV_SQL_SERVER_URL }}
           SQL_USER: ${{ secrets.DEV_SQL_USER }}
           SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
         run: |
-          $ispacPath = "${{ github.workspace }}\build\Development\TimesheetMigrationV2.ispac"
-          
-          # Validate ispac exists
+          cd "${{ github.workspace }}"
+          $ispacPath = Join-Path ${PWD} "build\Development\TimesheetMigrationV2.ispac"
           if (-not (Test-Path $ispacPath)) {
-              Write-Error "Missing .ispac file at $ispacPath"
-              exit 1
+            throw "ISPAC file not found at $ispacPath"
           }
+          $bytes = [System.IO.File]::ReadAllBytes($ispacPath)
+          $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
 
-          # Convert to hex
-          try {
-              $bytes = [System.IO.File]::ReadAllBytes($ispacPath)
-              $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
-          } catch {
-              Write-Error "Failed to read .ispac file: $_"
-              exit 1
-          }
-
-          # Deployment SQL
           $sql = @"
+          DECLARE @project_binary VARBINARY(MAX) = 0x$hex
           BEGIN TRY
-              IF NOT EXISTS (SELECT 1 FROM [SSISDB].[catalog].[folders] WHERE [name] = 'TimesheetMigrationPacks')
-                  EXEC [SSISDB].[catalog].[create_folder] 'TimesheetMigrationPacks'
-              
-              IF EXISTS (SELECT 1 FROM [SSISDB].[catalog].[projects] WHERE [name] = 'TimesheetMigrationV2')
-                  EXEC [SSISDB].[catalog].[delete_project] 'TimesheetMigrationPacks', 'TimesheetMigrationV2'
-              
-              DECLARE @project_binary VARBINARY(MAX) = 0x$hex
-              EXEC [SSISDB].[catalog].[deploy_project] 
-                  @folder_name = 'TimesheetMigrationPacks',
-                  @project_name = 'TimesheetMigrationV2',
-                  @project_stream = @project_binary
-              SELECT 'Deployment succeeded' AS Result
+          IF EXISTS (SELECT 1 FROM [SSISDB].[catalog].[projects] WHERE [name] = 'TimesheetMigrationV2')
+            EXEC [SSISDB].[catalog].[delete_project] 'TimesheetMigrationPacks', 'TimesheetMigrationV2'
+          
+          EXEC [SSISDB].[catalog].[deploy_project] 
+            @folder_name = 'TimesheetMigrationPacks',
+            @project_name = 'TimesheetMigrationV2',
+            @project_stream = @project_binary
+          PRINT 'Deployment successful'
           END TRY
           BEGIN CATCH
-              SELECT 
-                  'ERROR: ' + ERROR_MESSAGE() AS Error,
-                  ERROR_LINE() AS ErrorLine,
-                  ERROR_NUMBER() AS ErrorNumber
-              THROW
+          PRINT 'ERROR: ' + ERROR_MESSAGE()
+          THROW
           END CATCH
           "@
 
-          # Execute deployment
-          try {
-              $output = sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -Q "$sql"
-              $output | Write-Output
-          } catch {
-              Write-Error "Deployment failed: $_"
-              exit 1
+          # Run sqlcmd and check exit code
+          sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -Q "$sql" -o "deploy.log"
+          if ($LASTEXITCODE -ne 0) {
+            throw "sqlcmd failed with exit code $LASTEXITCODE. Check deploy.log for details."
           }
+        shell: powershell
