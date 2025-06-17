@@ -39,7 +39,8 @@ jobs:
       - name: Deploy SSIS Package
         run: |
           cd "${{ github.workspace }}"
-          SSISDeploy.exe -s:build\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/Timesheet -authType:SQL -u:${{ secrets.DEV_SQL_USER }} -p:${{ secrets.DEV_SQL_PASSWORD }} -server:${{ secrets.DEV_SQL_SERVER_URL }} -l:INFO;deploy.log
+          echo Deploying to -d:CATALOG;/SSISDB/Timesheet;${{ secrets.DEV_SQL_SERVER_URL }}
+          SSISDeploy.exe -s:build\TimesheetMigrationV2.ispac -d:CATALOG;/SSISDB/Timesheet;${{ secrets.DEV_SQL_SERVER_URL }} -authType:SQL -u:${{ secrets.DEV_SQL_USER }} -p:${{ secrets.DEV_SQL_PASSWORD }} -l:INFO;deploy.log
         shell: cmd
 
       # Optional: Archive the .ispac file and logs as artifacts
