@@ -1,0 +1,67 @@
+name: Deploy SSIS Package TEST
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+      # Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Debug: Verify directory contents
+      - name: List directory contents
+        run: dir "${{ github.workspace }}"
+        shell: cmd
+
+      # Verify the .dtproj file exists
+      - name: Check dtproj file
+        run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
+        shell: cmd
+
+      # Install SSIS DevOps Tools
+      - name: Setup SSIS DevOps Tools
+        uses: jonlabelle/setup-ssis-devops-tools@v1
+
+      # Build SSIS project to generate .ispac file
+      - name: Build SSIS Project
+        run: |
+          cd "${{ github.workspace }}"
+          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -ss -l:INFO;build.log
+        shell: cmd
+
+      # Deploy .ispac file to SSIS Catalog
+      - name: Deploy SSIS Package
+        env:
+          SQL_SERVER: ${{ secrets.DEV_SQL_SERVER_URL }}
+          SQL_USER: ${{ secrets.DEV_SQL_USER }}
+          SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
+        run: |
+          $ispacPath = "D:\a\AutoExpose\AutoExpose\Timesheet\build\Development\TimesheetMigrationV2.ispac"
+          $bytes = [System.IO.File]::ReadAllBytes($ispacPath)
+          $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
+
+          $sql = @"
+          DECLARE @project_binary VARBINARY(MAX) = 0x$hex
+          BEGIN TRY
+          IF EXISTS (SELECT 1 FROM [SSISDB].[catalog].[projects] WHERE [name] = 'TimesheetMigrationV2')
+            EXEC [SSISDB].[catalog].[delete_project] 'TimesheetMigrationPacks', 'TimesheetMigrationV2'
+          
+          EXEC [SSISDB].[catalog].[deploy_project] 
+            @folder_name = 'TimesheetMigrationPacks',
+            @project_name = 'TimesheetMigrationV2',
+            @project_stream = @project_binary
+          PRINT 'Deployment successful'
+          END TRY
+          BEGIN CATCH
+          PRINT 'ERROR: ' + ERROR_MESSAGE()
+          THROW
+          END CATCH
+          "@
+
+          sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -Q "$sql"
