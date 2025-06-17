@@ -27,7 +27,7 @@ jobs:
       - name: Build SSIS Project
         run: |
           cd "${{ github.workspace }}"
-          SSISBuild.exe "Timesheet\TimesheetMigrationV2.dtproj" -Configuration Release -OutputFolder "build" -ProtectionLevel DontSaveSensitive
+          SSISBuild.exe -p "Timesheet\TimesheetMigrationV2.dtproj" -c "Release" -o "build" -ss
         shell: cmd
 
       # Deploy .ispac file to SSIS Catalog
