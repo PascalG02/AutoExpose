@@ -1,6 +1,9 @@
 name: Deploy SSIS Package
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -11,6 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Debug: Verify directory contents
+      - name: List directory contents
+        run: dir "${{ github.workspace }}"
+        shell: cmd
+
       # Install SSIS DevOps Tools
       - name: Setup SSIS DevOps Tools
         uses: jonlabelle/setup-ssis-devops-tools@v1
@@ -18,13 +26,14 @@ jobs:
       # Build SSIS project to generate .ispac file
       - name: Build SSIS Project
         run: |
-          SSISBuild.exe "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" -Configuration Release -OutputFolder "${{ github.workspace }}\build" -ProtectionLevel DontSaveSensitive
+          cd "${{ github.workspace }}"
+          SSISBuild.exe "Timesheet\TimesheetMigrationV2.dtproj" -Configuration Release -OutputFolder "build" -ProtectionLevel DontSaveSensitive
         shell: cmd
 
       # Deploy .ispac file to SSIS Catalog
       - name: Deploy SSIS Package
         run: |
-          SSISDeploy.exe "${{ github.workspace }}\build\TimesheetMigrationV2.ispac" -Catalog SSISDB -Server "${{ secrets.SQL_SERVER_NAME }}" -User "${{ secrets.SQL_SERVER_USER }}" -Password "${{ secrets.SQL_SERVER_PASSWORD }}"
+          SSISDeploy.exe "build\TimesheetMigrationV2.ispac" -Catalog SSISDB -Server "${{ secrets.SQL_SERVER_NAME }}" -User "${{ secrets.SQL_SERVER_USER }}" -Password "${{ secrets.SQL_SERVER_PASSWORD }}"
         shell: cmd
 
       # Optional: Archive the .ispac file as an artifact
