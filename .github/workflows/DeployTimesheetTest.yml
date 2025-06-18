@@ -1,94 +1,38 @@
-name: Deploy SSIS Package TEST
+name: SSIS Deployment (CMD Only)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
-    runs-on: windows-latest
+    runs-on: self-hosted
+    environment: local-dev
+
     steps:
-      # Check out the repository
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # Debug: Verify directory contents
-      - name: List directory contents
-        run: dir "${{ github.workspace }}"
-        shell: cmd
-
-      # Verify the .dtproj file exists
-      - name: Check dtproj file
-        run: if not exist "${{ github.workspace }}\Timesheet\TimesheetMigrationV2.dtproj" exit /b 1
-        shell: cmd
-
-      # Install SSIS DevOps Tools
-      - name: Setup SSIS DevOps Tools
-        uses: jonlabelle/setup-ssis-devops-tools@v1
-
-      # Build SSIS project to generate .ispac file
-      - name: Build SSIS Project
+      - name: Download SSIS DevOps Tools
         run: |
-          cd "${{ github.workspace }}"
-          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -c:Development -o:build -ss -l:INFO;build.log
-        shell: cmd
+          mkdir "C:\ssis-tools"
+          curl -L https://github.com/microsoft/SSIS-DevOps-Tools/releases/latest/download/SSISDevOpsTools.zip -o "C:\ssis-tools\tools.zip"
+          if not exist "C:\ssis-tools\tools.zip" (
+            echo "::error::Failed to download SSIS DevOps Tools!"
+            exit /b 1
+          )
+          cd / Focusing on the root cause, the issue is that `SSISBuild.exe` is not found. Let’s prioritize verifying the tool’s presence and PATH configuration.
 
-      # Deploy .ispac file to SSIS Catalog
-      - name: Deploy SSIS Package
-        env:
-          SQL_SERVER: ${{ secrets.DEV_SQL_SERVER_URL }}
-          SQL_USER: ${{ secrets.DEV_SQL_USER }}
-          SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
-        run: |
-          cd "${{ github.workspace }}"
-          $ispacPath = Join-Path ${PWD} "Timesheet\build\Development\TimesheetMigrationV2.ispac"
-          if (-not (Test-Path $ispacPath)) {
-            throw "ISPAC file not found at $ispacPath"
-          }
-          Write-Host "ISPAC file found at: $ispacPath"
-          $bytes = [System.IO.File]::ReadAllBytes($ispacPath)
-          $hex = [System.BitConverter]::ToString($bytes).Replace("-","")
-          Write-Host "Hex string length: $($hex.Length) characters"
+### Immediate Actions
+1. **Check `C:\ssis-tools` on the Runner**:
+   - Log into `LAPTOP-H6CGEPKT`.
+   - Navigate to `C:\ssis-tools` and confirm `SSISBuild.exe` exists.
+   - If not, manually download the SSIS DevOps Tools from the correct source (e.g., Microsoft’s GitHub releases) and extract to `C:\ssis-tools`.
 
-          # Read and modify the SQL script
-          $sqlScriptPath = Join-Path ${PWD} "scripts\DeploySSIS.sql"
-          if (-not (Test-Path $sqlScriptPath)) {
-            throw "SQL script not found at $sqlScriptPath"
-          }
-          $sqlContent = Get-Content -Path $sqlScriptPath -Raw
-          $sqlContent = $sqlContent -replace 'SET @project_binary = 0x;', "SET @project_binary = 0x$hex;"
-
-          # Write the updated SQL script to a file and execute
-          $sqlFile = Join-Path ${PWD} "deploy_script.sql"
-          $sqlContent | Out-File -FilePath $sqlFile -Encoding UTF8
-
-          Write-Host "Executing sqlcmd against $env:SQL_SERVER with user $env:SQL_USER"
-          sqlcmd -S "$env:SQL_SERVER" -U "$env:SQL_USER" -P "$env:SQL_PASSWORD" -d "SSISDB" -i $sqlFile -o "deploy.log"
-          if ($LASTEXITCODE -ne 0) {
-            throw "sqlcmd failed with exit code $LASTEXITCODE. Check deploy.log for details."
-          }
-
-          # Clean up temporary file
-          Remove-Item $sqlFile -Force
-        shell: powershell
-
-      # Optional: Archive the .ispac file and logs as artifacts
-      - name: Upload ISPAC Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ssis-deployment-package
-          path: ${{ github.workspace }}\Timesheet\build\Development\TimesheetMigrationV2.ispac
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: ${{ github.workspace }}\build.log
-
-      - name: Upload Deploy Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: deploy-log
-          path: ${{ github.workspace }}\deploy.log
+2. **Test PATH Locally**:
+   - Open a command prompt on the runner machine.
+   - Run:
+     ```cmd
+     set PATH=%PATH%;C:\ssis-tools
+     where SSISBuild.exe
