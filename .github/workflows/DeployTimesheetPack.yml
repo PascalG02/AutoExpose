@@ -38,8 +38,8 @@ jobs:
       - name: Build SSIS Package
         run: |
           cd /d "%GITHUB_WORKSPACE%"
-          C:\ssis-tools\SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -l:build.log
-          if not exist "Timesheet\build\Release\TimesheetMigrationV2.ispac" (
+          C:\ssis-tools\SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Development -l:build.log
+          if not exist "Timesheet\build\Development\TimesheetMigrationV2.ispac" (
             echo "::error::Build failed!"
             type build.log || echo "No build log available"
             exit /b 1
@@ -49,7 +49,7 @@ jobs:
       - name: Deploy to SQL Server
         run: |
           cd /d "%GITHUB_WORKSPACE%"
-          C:\ssis-tools\SSISDeploy.exe -s:Timesheet\build\Release\TimesheetMigrationV2.ispac ^
+          C:\ssis-tools\SSISDeploy.exe -s:Timesheet\build\Development\TimesheetMigrationV2.ispac ^
             -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT ^
             -authType:WIN ^
             -l:deploy.log
@@ -74,6 +74,6 @@ jobs:
         with:
           name: deployment-artifacts
           path: |
-            %GITHUB_WORKSPACE%\Timesheet\build\Release\TimesheetMigrationV2.ispac
+            %GITHUB_WORKSPACE%\Timesheet\build\Development\TimesheetMigrationV2.ispac
             %GITHUB_WORKSPACE%\build.log
             %GITHUB_WORKSPACE%\deploy.log
