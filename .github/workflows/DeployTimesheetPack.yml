@@ -1,4 +1,3 @@
-#LAPTOP-H6CGEPKT
 name: SSIS Deployment (CMD Only)
 
 on:
@@ -10,7 +9,7 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
     environment: local-dev
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,17 +17,15 @@ jobs:
       - name: Download SSIS DevOps Tools
         run: |
           mkdir "C:\ssis-tools"
-          curl -L https://github.com/jonlabelle/SSIS DevOpsTools/releases/latest/download/SSISDevOpsTools.zip -o "C:\ssis-tools\tools.zip"
+          curl -L https://github.com/microsoft/SSIS-DevOps-Tools/releases/latest/download/SSISDevOpsTools.zip -o "C:\ssis-tools\tools.zip"
           cd /d "C:\ssis-tools"
           tar -xf tools.zip
           del tools.zip
-          echo "::set-output name=tools_path::C:\ssis-tools"
-        id: get-tools
         shell: cmd
 
       - name: Add Tools to PATH
         run: |
-          setx PATH "%PATH%;%{{ steps.get-tools.outputs.tools_path }}%"
+          set "PATH=%PATH%;C:\ssis-tools"
         shell: cmd
 
       - name: Validate SSIS project
@@ -46,7 +43,7 @@ jobs:
           
           if not exist "Timesheet\build\Release\TimesheetMigrationV2.ispac" (
             echo "::error::Build failed!"
-            type build.log
+            type build.log || echo "No build log available"
             exit /b 1
           )
         shell: cmd
@@ -61,7 +58,7 @@ jobs:
           
           if %ERRORLEVEL% neq 0 (
             echo "::error::Deployment failed!"
-            type deploy.log
+            type deploy.log || echo "No deploy log available"
             exit /b 1
           )
         shell: cmd
