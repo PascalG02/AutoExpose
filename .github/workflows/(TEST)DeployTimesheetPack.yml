@@ -1,4 +1,4 @@
-name: SSIS Deployment (CMD Only)
+name: SSIS Deployment (DEBUGGING)
 
 on:
   workflow_dispatch:
