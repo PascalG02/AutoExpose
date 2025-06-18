@@ -1,20 +1,15 @@
-DECLARE @project_binary VARBINARY(MAX);
+-- Create folder if not exists
+IF NOT EXISTS (SELECT 1 FROM SSISDB.catalog.folders WHERE name = 'TimesheetMigrationPacks')
+BEGIN
+  EXEC SSISDB.catalog.create_folder @folder_name = 'TimesheetMigrationPacks', @folder_id = NULL
+END
 
--- Set the binary data (to be replaced by workflow)
-SET @project_binary = 0x;
+-- Deploy the package
+DECLARE @ProjectBinary VARBINARY(MAX)
+SELECT @ProjectBinary = BulkColumn 
+FROM OPENROWSET(BULK '$(IspacPath)', SINGLE_BLOB) AS x
 
-BEGIN TRY
-    IF EXISTS (SELECT 1 FROM [SSISDB].[catalog].[projects] WHERE [name] = 'TimesheetMigrationV2')
-        EXEC [SSISDB].[catalog].[delete_project] 'TimesheetMigrationPacks', 'TimesheetMigrationV2';
-    
-    EXEC [SSISDB].[catalog].[deploy_project] 
-        @folder_name = 'TimesheetMigrationPacks',
-        @project_name = 'TimesheetMigrationV2',
-        @project_stream = @project_binary;
-    
-    PRINT 'Deployment successful to server: ' + @@SERVERNAME + ', folder: TimesheetMigrationPacks, project: TimesheetMigrationV2';
-END TRY
-BEGIN CATCH
-    PRINT 'ERROR: ' + ERROR_MESSAGE();
-    THROW;
-END CATCH
+EXEC SSISDB.catalog.deploy_project 
+  @folder_name = 'TimesheetMigrationPacks',
+  @project_name = 'TimesheetMigrationV2',
+  @project_stream = @ProjectBinary
