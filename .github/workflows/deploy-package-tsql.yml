@@ -1,0 +1,57 @@
+name: SSIS Timesheet Migration Deployment (T-SQL)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    environment: local-dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy using T-SQL
+        run: |
+          sqlcmd -S LAPTOP-H6CGEPKT -E -Q "
+            -- Create folder if not exists
+            IF NOT EXISTS (SELECT 1 FROM SSISDB.catalog.folders WHERE name = 'TimesheetMigrationPacks')
+            BEGIN
+              EXEC SSISDB.catalog.create_folder @folder_name = 'TimesheetMigrationPacks', @folder_id = NULL
+            END
+
+            -- Deploy the package
+            DECLARE @ProjectBinary VARBINARY(MAX)
+            SELECT @ProjectBinary = BulkColumn 
+            FROM OPENROWSET(BULK '$(GITHUB_WORKSPACE)\Timesheet\bin\Development\TimesheetMigrationV2.ispac', SINGLE_BLOB) AS x
+
+            EXEC SSISDB.catalog.deploy_project 
+              @folder_name = 'TimesheetMigrationPacks',
+              @project_name = 'TimesheetMigrationV2',
+              @project_stream = @ProjectBinary
+          " > deploy.log 2>&1
+          
+          if %ERRORLEVEL% neq 0 (
+            echo "::error::Deployment failed!"
+            type deploy.log || echo "No deploy log available"
+            exit /b 1
+          )
+        shell: cmd
+
+      - name: Verify Deployment
+        run: |
+          sqlcmd -S LAPTOP-H6CGEPKT -E -Q "SELECT name FROM SSISDB.catalog.projects WHERE name = 'TimesheetMigrationV2'"
+          if %ERRORLEVEL% neq 0 (
+            echo "::error::Verification failed!"
+            exit /b 1
+          )
+        shell: cmd
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: |
+            %GITHUB_WORKSPACE%\Timesheet\bin\Development\TimesheetMigrationV2.ispac
+            %GITHUB_WORKSPACE%\deploy.log
