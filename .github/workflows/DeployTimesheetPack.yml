@@ -14,18 +14,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download SSIS DevOps Tools
+      - name: Verify SSIS DevOps Tools
         run: |
-          mkdir "C:\ssis-tools"
-          curl -L https://github.com/microsoft/SSIS-DevOps-Tools/releases/latest/download/SSISDevOpsTools.zip -o "C:\ssis-tools\tools.zip"
-          cd /d "C:\ssis-tools"
-          tar -xf tools.zip
-          del tools.zip
-        shell: cmd
-
-      - name: Add Tools to PATH
-        run: |
-          set "PATH=%PATH%;C:\ssis-tools"
+          if not exist "C:\ssis-tools\SSISBuild.exe" (
+            echo "::error::SSISBuild.exe not found in C:\ssis-tools! Please install SSIS DevOps Tools manually from https://www.microsoft.com/download/details.aspx?id=105224"
+            exit /b 1
+          )
+          if not exist "C:\ssis-tools\SSISDeploy.exe" (
+            echo "::error::SSISDeploy.exe not found in C:\ssis-tools! Please install SSIS DevOps Tools manually from https://www.microsoft.com/download/details.aspx?id=105224"
+            exit /b 1
+          )
+          echo "SSIS DevOps Tools found in C:\ssis-tools"
         shell: cmd
 
       - name: Validate SSIS project
@@ -39,9 +38,8 @@ jobs:
       - name: Build SSIS Package
         run: |
           cd /d "%GITHUB_WORKSPACE%"
-          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Release -l:build.log
-          
-          if not exist "Timesheet\build\Release\TimesheetMigrationV2.ispac" (
+          C:\ssis-tools\SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Development -l:build.log
+          if not exist "Timesheet\build\Development\TimesheetMigrationV2.ispac" (
             echo "::error::Build failed!"
             type build.log || echo "No build log available"
             exit /b 1
@@ -51,11 +49,10 @@ jobs:
       - name: Deploy to SQL Server
         run: |
           cd /d "%GITHUB_WORKSPACE%"
-          SSISDeploy.exe -s:Timesheet\build\Release\TimesheetMigrationV2.ispac ^
+          C:\ssis-tools\SSISDeploy.exe -s:Timesheet\build\Development\TimesheetMigrationV2.ispac ^
             -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT ^
             -authType:WIN ^
             -l:deploy.log
-          
           if %ERRORLEVEL% neq 0 (
             echo "::error::Deployment failed!"
             type deploy.log || echo "No deploy log available"
@@ -77,6 +74,6 @@ jobs:
         with:
           name: deployment-artifacts
           path: |
-            %GITHUB_WORKSPACE%\Timesheet\build\Release\TimesheetMigrationV2.ispac
+            %GITHUB_WORKSPACE%\Timesheet\build\Development\TimesheetMigrationV2.ispac
             %GITHUB_WORKSPACE%\build.log
             %GITHUB_WORKSPACE%\deploy.log
