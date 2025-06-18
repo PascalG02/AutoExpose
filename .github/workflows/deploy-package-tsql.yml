@@ -1,4 +1,4 @@
-name: SSIS Timesheet Migration Deployment (T-SQL)
+name: SSIS Deployment (T-SQL)
 
 on:
   workflow_dispatch:
