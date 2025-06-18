@@ -1,0 +1,47 @@
+name: SSIS Timesheet Migration Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    environment: local-dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to SQL Server
+        run: |
+          cd /d "%GITHUB_WORKSPACE%"
+          C:\ssis-tools\SSISDeploy.exe -s:Timesheet\bin\Development\TimesheetMigrationV2.ispac ^
+            -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT ^
+            -authType:WIN ^
+            -l:deploy.log
+          if %ERRORLEVEL% neq 0 (
+            echo "::error::Deployment failed!"
+            type deploy.log || echo "No deploy log available"
+            exit /b 1
+          )
+        shell: cmd
+
+      - name: Verify Deployment
+        run: |
+          sqlcmd -S LAPTOP-H6CGEPKT -E -Q "SELECT name FROM SSISDB.catalog.projects WHERE name = 'TimesheetMigrationV2'"
+          if %ERRORLEVEL% neq 0 (
+            echo "::error::Verification failed!"
+            exit /b 1
+          )
+        shell: cmd
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: |
+            %GITHUB_WORKSPACE%\Timesheet\build\Development\TimesheetMigrationV2.ispac
+            %GITHUB_WORKSPACE%\build.log
+            %GITHUB_WORKSPACE%\deploy.log
