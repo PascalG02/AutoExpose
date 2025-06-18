@@ -34,12 +34,3 @@ jobs:
             exit /b 1
           )
         shell: cmd
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-artifacts
-          path: |
-            %GITHUB_WORKSPACE%\Timesheet\build\Development\TimesheetMigrationV2.ispac
-            %GITHUB_WORKSPACE%\build.log
-            %GITHUB_WORKSPACE%\deploy.log
