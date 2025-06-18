@@ -2,16 +2,16 @@ USE msdb;
 GO
 
 -- Check if the job already exists and delete it to avoid conflicts
-IF EXISTS (SELECT job_id FROM msdb.dbo.sysjobs WHERE name = N'RunLoadTimesheetEveryMinute')
+IF EXISTS (SELECT job_id FROM msdb.dbo.sysjobs WHERE name = N'RunTimesheetMigration')
 BEGIN
-    EXEC msdb.dbo.sp_delete_job @job_name = N'RunLoadTimesheetEveryMinute', @delete_unused_schedule = 1;
+    EXEC msdb.dbo.sp_delete_job @job_name = N'RunTimesheetMigration', @delete_unused_schedule = 1;
 END
 GO
 
 -- Create the SQL Server Agent job
 DECLARE @jobId BINARY(16);
 EXEC msdb.dbo.sp_add_job
-    @job_name = N'RunLoadTimesheetEveryMinute',
+    @job_name = N'RunTimesheetMigration',
     @enabled = 1,
     @description = N'Job to execute LoadTimesheet.dtsx SSIS package every minute',
     @owner_login_name = N'sa', -- Replace with appropriate login if needed
@@ -23,7 +23,7 @@ EXEC msdb.dbo.sp_add_jobstep
     @step_name = N'Execute LoadTimesheet SSIS Package',
     @step_id = 1,
     @subsystem = N'SSIS',
-    @command = N'/ISSERVER "\"\SSISDB\TimesheetMigrationPacks\TimesheetMigrationV2\LoadTimesheets.dtsx\"" /SERVER "\".\""',
+    @command = N'/ISSERVER "\"\SSISDB\TimesheetMigration\TimesheetMigrationV2\LoadTimesheets.dtsx\"" /SERVER "\".\""',
     @on_success_action = 1, -- Quit with success
     @on_fail_action = 2; -- Quit with failure
 
