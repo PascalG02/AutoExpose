@@ -16,16 +16,35 @@ jobs:
 
       - name: Download SSIS DevOps Tools
         run: |
-          mkdir "C:\ssis-tools"
-          curl -L https://github.com/microsoft/SSIS-DevOps-Tools/releases/latest/download/SSISDevOpsTools.zip -o "C:\ssis-tools\tools.zip"
-          cd /d "C:\ssis-tools"
-          tar -xf tools.zip
-          del tools.zip
+          if not exist "C:\ssis-tools\SSISBuild.exe" (
+            mkdir "C:\ssis-tools"
+            curl -L <correct-URL> -o "C:\ssis-tools\tools.zip"
+            if not exist "C:\ssis-tools\tools.zip" (
+              echo "::error::Failed to download SSIS DevOps Tools!"
+              exit /b 1
+            )
+            cd /d "C:\ssis-tools"
+            powershell -Command "Expand-Archive -Path tools.zip -DestinationPath . -Force"
+            if not exist "C:\ssis-tools\SSISBuild.exe" (
+              echo "::error::SSISBuild.exe not found after extraction!"
+              dir "C:\ssis-tools"
+              exit /b 1
+            )
+            del tools.zip
+          ) else (
+            echo "SSIS DevOps Tools already installed in C:\ssis-tools"
+          )
         shell: cmd
 
       - name: Add Tools to PATH
         run: |
           set "PATH=%PATH%;C:\ssis-tools"
+          echo %PATH%
+          where SSISBuild.exe
+          if %ERRORLEVEL% neq 0 (
+            echo "::error::SSISBuild.exe not found in PATH!"
+            exit /b 1
+          )
         shell: cmd
 
       - name: Validate SSIS project
@@ -40,7 +59,6 @@ jobs:
         run: |
           cd /d "%GITHUB_WORKSPACE%"
           SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Release -l:build.log
-          
           if not exist "Timesheet\build\Release\TimesheetMigrationV2.ispac" (
             echo "::error::Build failed!"
             type build.log || echo "No build log available"
@@ -55,7 +73,6 @@ jobs:
             -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT ^
             -authType:WIN ^
             -l:deploy.log
-          
           if %ERRORLEVEL% neq 0 (
             echo "::error::Deployment failed!"
             type deploy.log || echo "No deploy log available"
