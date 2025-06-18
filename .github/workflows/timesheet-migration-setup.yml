@@ -14,9 +14,15 @@ on:
 
 jobs:
   DeployDatabase:
-    uses: ./.github/workflows/auto-deploy-sql.yml
+    uses: ./.github/workflows/sql-deploy-template.yml
     with:
       sql_script: ${{ github.event.inputs.DB_script }}
+      environment_name: SQLServer
+    secrets:
+      SQL_SERVER_URL: ${{ secrets.DEV_SQL_SERVER_URL }}
+      SQL_USERNAME: ${{ secrets.DEV_SQL_USER }}
+      SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
 
   DeploySSISPackage:
     needs: DeployDatabase
@@ -24,7 +30,13 @@ jobs:
 
   DeployScheduledJob:
     needs: DeploySSISPackage
-    uses: ./.github/workflows/auto-deploy-sql.yml
+    uses: ./.github/workflows/sql-deploy-template.yml
     with:
       sql_script: ${{ github.event.inputs.job_script }}
+      environment_name: Job_Schedule
+    secrets:
+      SQL_SERVER_URL: ${{ secrets.DEV_SQL_SERVER_URL }}
+      SQL_USERNAME: ${{ secrets.DEV_SQL_USER }}
+      SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
       
