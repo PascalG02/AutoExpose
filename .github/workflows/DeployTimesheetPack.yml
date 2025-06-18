@@ -9,6 +9,8 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
     environment: local-dev
+    env:
+      PATH: ${PATH};C:\ssis-tools  # Updated to point to C:\ssis-tools since no bin folder
 
     steps:
       - name: Checkout code
@@ -29,7 +31,6 @@ jobs:
 
       - name: Add Tools to PATH
         run: |
-          set "PATH=%PATH%;C:\ssis-tools"
           echo %PATH%
           where SSISBuild.exe
           if %ERRORLEVEL% neq 0 (
@@ -49,7 +50,7 @@ jobs:
       - name: Build SSIS Package
         run: |
           cd /d "%GITHUB_WORKSPACE%"
-          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Release -l:build.log
+          C:\ssis-tools\SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Release -l:build.log
           if not exist "Timesheet\build\Release\TimesheetMigrationV2.ispac" (
             echo "::error::Build failed!"
             type build.log || echo "No build log available"
@@ -60,7 +61,7 @@ jobs:
       - name: Deploy to SQL Server
         run: |
           cd /d "%GITHUB_WORKSPACE%"
-          SSISDeploy.exe -s:Timesheet\build\Release\TimesheetMigrationV2.ispac ^
+          C:\ssis-tools\SSISDeploy.exe -s:Timesheet\build\Release\TimesheetMigrationV2.ispac ^
             -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT ^
             -authType:WIN ^
             -l:deploy.log
