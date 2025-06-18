@@ -14,26 +14,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download SSIS DevOps Tools
+      - name: Verify SSIS DevOps Tools
         run: |
           if not exist "C:\ssis-tools\SSISBuild.exe" (
-            mkdir "C:\ssis-tools"
-            curl -L <correct-URL> -o "C:\ssis-tools\tools.zip"
-            if not exist "C:\ssis-tools\tools.zip" (
-              echo "::error::Failed to download SSIS DevOps Tools!"
-              exit /b 1
-            )
-            cd /d "C:\ssis-tools"
-            powershell -Command "Expand-Archive -Path tools.zip -DestinationPath . -Force"
-            if not exist "C:\ssis-tools\SSISBuild.exe" (
-              echo "::error::SSISBuild.exe not found after extraction!"
-              dir "C:\ssis-tools"
-              exit /b 1
-            )
-            del tools.zip
-          ) else (
-            echo "SSIS DevOps Tools already installed in C:\ssis-tools"
+            echo "::error::SSISBuild.exe not found in C:\ssis-tools! Please install SSIS DevOps Tools manually from https://www.microsoft.com/download/details.aspx?id=105224"
+            exit /b 1
           )
+          if not exist "C:\ssis-tools\SSISDeploy.exe" (
+            echo "::error::SSISDeploy.exe not found in C:\ssis-tools! Please install SSIS DevOps Tools manually from https://www.microsoft.com/download/details.aspx?id=105224"
+            exit /b 1
+          )
+          echo "SSIS DevOps Tools found in C:\ssis-tools"
         shell: cmd
 
       - name: Add Tools to PATH
