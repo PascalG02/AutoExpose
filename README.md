@@ -1,4 +1,4 @@
-This folder stores the different workflows/GitHub actions used in the SQL Deployment Project.
+This repo stores the different workflows/GitHub actions used in the SQL Deployment Project.
 
 PHASE 1 - Auto Deploy SQL script to create a database , a table and insert values. Make use of a tunnel service and create a user to log remotely.
 
