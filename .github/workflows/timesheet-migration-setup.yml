@@ -1,0 +1,30 @@
+name: Initialise Timesheet Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      DB_script:
+        description: 'Path to the DB SQL script'
+        required: true
+        type: string
+      job_script:
+        description: 'Path to the Job Schedule SQL script'
+        required: true
+        type: string
+
+jobs:
+  DeployDatabase:
+    uses: ./.github/workflows/auto-deploy-sql.yml
+    with:
+      sql_script: ${{ github.event.inputs.DB_script }}
+
+  DeploySSISPackage:
+    needs: DeployDatabase
+    uses: ./.github/workflows/tsql-deploy-package.yml
+
+  DeployScheduledJob:
+    needs: DeploySSISPackage
+    uses: ./.github/workflows/auto-deploy-sql.yml
+    with:
+      sql_script: ${{ github.event.inputs.job_script }}
+      
