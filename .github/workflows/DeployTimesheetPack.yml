@@ -20,6 +20,30 @@ jobs:
         run: dir "${{ github.workspace }}" /s
         shell: cmd
 
+      # Install SSIS DevOps tools with proper path handling
+      - name: Setup SSIS DevOps Tools
+        id: ssis-tools
+        uses: jonlabelle/setup-ssis-devops-tools@v1
+        continue-on-error: false
+
+      # Verify tools installation
+      - name: Verify SSIS Tools Installation
+        run: |
+          echo "Tools path: ${{ steps.ssis-tools.outputs.ssis_tools_path }}"
+          dir "${{ steps.ssis-tools.outputs.ssis_tools_path }}"
+          if not exist "${{ steps.ssis-tools.outputs.ssis_tools_path }}\SSISBuild.exe" (
+            echo "::error::SSIS tools not installed properly!"
+            exit 1
+          )
+        shell: cmd
+
+      # Add tools to PATH
+      - name: Add SSIS Tools to PATH
+        run: |
+          echo "${{ steps.ssis-tools.outputs.ssis_tools_path }}" >> $env:GITHUB_PATH
+          echo "Updated PATH: $env:PATH"
+        shell: powershell
+
       # Verify SSIS project exists
       - name: Validate SSIS project
         run: |
@@ -29,47 +53,57 @@ jobs:
           )
         shell: cmd
 
-      # Install SSIS DevOps tools
-      - name: Setup SSIS DevOps Tools
-        uses: jonlabelle/setup-ssis-devops-tools@v1
-
-      # Build the SSIS project
+      # Build the SSIS project with detailed logging
       - name: Build SSIS Package
         run: |
           cd "${{ github.workspace }}"
-          SSISBuild.exe -p:Timesheet\TimesheetMigrationV2.dtproj -o:build -c:Release -l:build.log
+          echo "Building with SSISBuild from ${{ steps.ssis-tools.outputs.ssis_tools_path }}"
+          
+          "${{ steps.ssis-tools.outputs.ssis_tools_path }}\SSISBuild.exe" `
+            -p:Timesheet\TimesheetMigrationV2.dtproj `
+            -o:build `
+            -c:Release `
+            -l:build.log -v:diag
           
           if not exist "Timesheet\build\Release\TimesheetMigrationV2.ispac" (
             echo "::error::Build failed - ISPAC file not generated"
             type build.log
             exit 1
           )
-        shell: cmd
+          echo "Build successful"
+        shell: powershell
 
       # Deploy using Windows Auth to local SQL Server
       - name: Deploy to Local SQL Server
         run: |
           cd "${{ github.workspace }}"
           echo "Deploying with Windows Authentication to local SQL Server"
+          echo "Using SSISDeploy from ${{ steps.ssis-tools.outputs.ssis_tools_path }}"
           
-          SSISDeploy.exe -s:Timesheet\build\Release\TimesheetMigrationV2.ispac `
-                        -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT `
-                        -authType:WIN `
-                        -l:deploy.log
+          "${{ steps.ssis-tools.outputs.ssis_tools_path }}\SSISDeploy.exe" `
+            -s:Timesheet\build\Release\TimesheetMigrationV2.ispac `
+            -d:CATALOG;/SSISDB/TimesheetMigrationPacks/TimesheetMigrationV2;LAPTOP-H6CGEPKT `
+            -authType:WIN `
+            -l:deploy.log -v:diag
           
-          if %ERRORLEVEL% neq 0 (
+          if $LASTEXITCODE -ne 0 {
             echo "::error::Deployment failed!"
-            type deploy.log
+            Get-Content deploy.log
             exit 1
-          )
+          }
           echo "Deployment successful"
-        shell: cmd
+        shell: powershell
 
-      # Optional: Verify deployment
+      # Verify deployment
       - name: Verify Deployment
         run: |
-          sqlcmd -S localhost -E -Q "SELECT name, created_time FROM SSISDB.catalog.projects WHERE name = 'TimesheetMigrationV2'"
-        shell: cmd
+          $result = sqlcmd -S LAPTOP-H6CGEPKT -E -Q "SELECT name, created_time FROM SSISDB.catalog.projects WHERE name = 'TimesheetMigrationV2'"
+          if (-not $result) {
+            echo "::error::Deployment verification failed!"
+            exit 1
+          }
+          echo $result
+        shell: powershell
 
       # Upload artifacts for debugging
       - name: Upload Build Artifacts
