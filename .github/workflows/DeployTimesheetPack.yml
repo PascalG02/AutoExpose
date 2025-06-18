@@ -9,8 +9,6 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
     environment: local-dev
-    env:
-      PATH: ${PATH};C:\ssis-tools  # Updated to point to C:\ssis-tools since no bin folder
 
     steps:
       - name: Checkout code
@@ -27,16 +25,6 @@ jobs:
             exit /b 1
           )
           echo "SSIS DevOps Tools found in C:\ssis-tools"
-        shell: cmd
-
-      - name: Add Tools to PATH
-        run: |
-          echo %PATH%
-          where SSISBuild.exe
-          if %ERRORLEVEL% neq 0 (
-            echo "::error::SSISBuild.exe not found in PATH!"
-            exit /b 1
-          )
         shell: cmd
 
       - name: Validate SSIS project
