@@ -14,23 +14,9 @@ jobs:
 
       - name: Deploy using T-SQL
         run: |
-          sqlcmd -S LAPTOP-H6CGEPKT -E -Q "
-            -- Create folder if not exists
-            IF NOT EXISTS (SELECT 1 FROM SSISDB.catalog.folders WHERE name = 'TimesheetMigrationPacks')
-            BEGIN
-              EXEC SSISDB.catalog.create_folder @folder_name = 'TimesheetMigrationPacks', @folder_id = NULL
-            END
-
-            -- Deploy the package
-            DECLARE @ProjectBinary VARBINARY(MAX)
-            SELECT @ProjectBinary = BulkColumn 
-            FROM OPENROWSET(BULK '$(GITHUB_WORKSPACE)\Timesheet\bin\Development\TimesheetMigrationV2.ispac', SINGLE_BLOB) AS x
-
-            EXEC SSISDB.catalog.deploy_project 
-              @folder_name = 'TimesheetMigrationPacks',
-              @project_name = 'TimesheetMigrationV2',
-              @project_stream = @ProjectBinary
-          " > deploy.log 2>&1
+          set "ISPAC_PATH=%GITHUB_WORKSPACE%\Timesheet\bin\Development\TimesheetMigrationV2.ispac"
+          
+          sqlcmd -S LAPTOP-H6CGEPKT -E -v IspacPath="%ISPAC_PATH%" -i scripts/DeploySSIS.sql > deploy.log 2>&1
           
           if %ERRORLEVEL% neq 0 (
             echo "::error::Deployment failed!"
