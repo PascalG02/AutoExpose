@@ -5,7 +5,7 @@ on:
   workflow_call:
 
 jobs:
-  build-and-deploy:
+  DeploySSIS:
     runs-on: self-hosted
     environment: SISS
 
@@ -15,7 +15,7 @@ jobs:
 
       - name: Deploy using T-SQL
         run: |
-          set "ISPAC_PATH=%GITHUB_WORKSPACE%\Timesheet\bin\Development\TimesheetMigrationV2.ispac"
+          set "ISPAC_PATH=%GITHUB_WORKSPACE%\Timesheet\TimesheetMigrationV2.ispac"
           
           sqlcmd -S LAPTOP-H6CGEPKT -E -v IspacPath="%ISPAC_PATH%" -i scripts/DeploySSIS.sql > deploy.log 2>&1
           
