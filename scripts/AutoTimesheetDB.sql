@@ -127,7 +127,7 @@ BEGIN
     CREATE TABLE ErrorLog (
         ErrorID INT PRIMARY KEY IDENTITY(1,1),
         FilePath NVARCHAR(1000),
-        ErrorCode NVARCHAR(255),
+        ErrorCode NVARCHAR(255) DEFAULT 'N/A',
         ErrorDescription NVARCHAR(1000),
         Timestamp DATETIME DEFAULT GETDATE()
     );
