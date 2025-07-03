@@ -22,7 +22,7 @@ def fetch_data(query):
     return f"Columns: {columns}\nData:\n{table_data}"
 
 # Get response from local Gemma model
-def get_llm_response(prompt, model='qwen3:1.7b'):
+def get_llm_response(prompt, model='gemma:2b'):
     response = ollama.chat(model=model, messages=[
         {"role": "user", "content": prompt}
     ])
@@ -79,7 +79,7 @@ Example:
 Question: {question}
 """
     # Get response from the LLM
-    response = get_llm_response(prompt,model="deepseek-coder:1.3b")
+    response = get_llm_response(prompt)
 
     # Remove any wrapping like ```sql or ```
     clean_query = response.strip()
@@ -105,7 +105,7 @@ It returned this data:
 
 Now provide a friendly, natural explanation of the result.
 """
-    return get_llm_response(prompt,model="deepseek-r1:1.5b")
+    return get_llm_response(prompt)
 
 # Run the full workflow
 if __name__ == "__main__":
