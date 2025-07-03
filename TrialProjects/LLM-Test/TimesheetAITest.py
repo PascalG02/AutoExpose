@@ -1,4 +1,3 @@
-
 import pyodbc
 import ollama
 
@@ -23,7 +22,7 @@ def fetch_data(query):
     return f"Columns: {columns}\nData:\n{table_data}"
 
 # Get response from local Gemma model
-def get_llm_response(prompt, model='gemma:2b'):
+def get_llm_response(prompt, model='qwen3:1.7b'):
     response = ollama.chat(model=model, messages=[
         {"role": "user", "content": prompt}
     ])
@@ -32,6 +31,12 @@ def get_llm_response(prompt, model='gemma:2b'):
 # Generate SQL query from natural question
 def generate_sql_from_question(question):
     schema = """
+Table: dbo.Employee
+
+Columns:
+- EmployeeID (PK, int)
+- EmployeeName (nvarchar)
+
 Table: dbo.Timesheet
 
 Columns:
@@ -49,16 +54,18 @@ Columns:
 - EndTime (time)
 """
     examples = """
-Q: What day did Jack take leave and what time?
-A: SELECT Date, StartTime, EndTime, Comments 
-   FROM dbo.Timesheet 
-   WHERE EmployeeID = (SELECT EmployeeID FROM Employee WHERE EmployeeName = 'Jack') 
-     AND (
-       Description LIKE '%leave%' 
-       OR Comments LIKE '%leave%' 
-       OR TotalHours = 0 
-       OR StartTime IS NULL
-     );
+Q: What day did John take leave and what time?
+A:
+SELECT t.Date, t.StartTime, t.EndTime, t.Comments
+FROM dbo.Timesheet t
+JOIN dbo.Employee e ON t.EmployeeID = e.EmployeeID
+WHERE e.EmployeeName = 'John'
+AND (
+  t.Description LIKE '%leave%'
+  OR t.Comments LIKE '%leave%'
+  OR t.TotalHours = 0
+  OR t.StartTime IS NULL
+);
 """
     prompt = f"""
 You are a SQL expert. Based on the schema and examples below, generate a raw SQL query only. Do not include explanations, backticks, or labels — just the query.
@@ -71,11 +78,16 @@ Example:
 
 Question: {question}
 """
-    # Get response
-    response = get_llm_response(prompt, model='gemma:2b')
+    # Get response from the LLM
+    response = get_llm_response(prompt,model="deepseek-coder:1.3b")
 
     # Remove any wrapping like ```sql or ```
-    clean_query = response.strip().removeprefix("```sql").removesuffix("```").strip()
+    clean_query = response.strip()
+    if clean_query.startswith("```sql"):
+        clean_query = clean_query.removeprefix("```sql").strip()
+    if clean_query.endswith("```"):
+        clean_query = clean_query.removesuffix("```").strip()
+
     return clean_query
 
 # Generate a friendly summary of the result
@@ -93,11 +105,13 @@ It returned this data:
 
 Now provide a friendly, natural explanation of the result.
 """
-    return get_llm_response(prompt, model='gemma:2b')
+    return get_llm_response(prompt,model="deepseek-r1:1.5b")
 
 # Run the full workflow
 if __name__ == "__main__":
-    question = "What day did John take leave?"
+
+    print("Hi! I'm your AI assistant for Timesheet queries. Let's get started!")
+    question = input("💬 How can I be of assistance: ")
 
     print("🧠 Interpreting question...")
     sql_query = generate_sql_from_question(question)
