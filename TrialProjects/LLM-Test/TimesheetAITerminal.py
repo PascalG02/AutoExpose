@@ -1,7 +1,6 @@
 import pyodbc
 import ollama
 
-
 # Connect and fetch query results
 def fetch_data(query):
     conn = pyodbc.connect(
@@ -23,7 +22,7 @@ def fetch_data(query):
     return f"Columns: {columns}\nData:\n{table_data}"
 
 # Get response from local Gemma model
-def get_llm_response(prompt, model='gemma3:1b'):
+def get_llm_response(prompt, model='gemma:2b'):
     response = ollama.chat(model=model, messages=[
         {"role": "user", "content": prompt}
     ])
@@ -69,7 +68,7 @@ AND (
 );
 """
     prompt = f"""
-You are a SQL expert working with sql server on SSMS. Based on the schema(only use those columns provided) and examples below, generate a raw SQL query only. Do not include explanations, backticks, or labels — just the query.
+You are a SQL expert. Based on the schema and examples below, generate a raw SQL query only. Do not include explanations, backticks, or labels — just the query.
 
 Schema:
 {schema}
@@ -104,7 +103,7 @@ You generated this SQL:
 It returned this data:
 {query_result}
 
-Provide a friendly, conversational explanation of the result in a short paragraph which answers the user's question directly.
+Provide a friendly, conversational explanation of the result in a short paragraph.
 """
     return get_llm_response(prompt)
 
