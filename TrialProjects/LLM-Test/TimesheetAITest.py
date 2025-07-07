@@ -69,7 +69,7 @@ AND (
 );
 """
     prompt = f"""
-You are a SQL expert working with sql server on SSMS. Based on the schema(only use those columns provided) and examples below, generate a raw SQL query only. Do not include explanations, backticks, or labels — just the query.
+You are a SQL expert working with sql server on SSMS. Based on the schema(only use those columns provided) and examples below, generate a raw SQL query only. Do not include explanations, backticks, or labels — just the query.You MUST use SQL Server Syntax.
 
 Schema:
 {schema}

@@ -1,3 +1,5 @@
 ollama
 pyodbc
 flask
+flask-cors
+python-dotenv
