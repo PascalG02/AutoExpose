@@ -3,3 +3,5 @@ pyodbc
 flask
 flask-cors
 python-dotenv
+flask-smorest
+sqlalchemy
