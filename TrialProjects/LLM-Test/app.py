@@ -18,7 +18,7 @@ CORS(app)  # Enable CORS for cross-origin requests
 # Initialize TimesheetService
 timesheet_service = TimesheetService()
 
-@app.route('/timesheetai', methods=['POST'])
+@app.route('/timesheetai')
 def query_ai():
     try:
         # Validate JSON input
