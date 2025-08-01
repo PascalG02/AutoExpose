@@ -5,3 +5,7 @@ flask-cors
 python-dotenv
 flask-smorest
 sqlalchemy
+langchain-huggingface
+langchain-community
+faiss-cpu
+sentence-transformers
